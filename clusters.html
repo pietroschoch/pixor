@@ -69,6 +69,8 @@
     table{width:100%; border-collapse:collapse; min-width:720px}
     th,td{padding:8px 10px; border-bottom:1px solid var(--border)}
     th{text-align:left; color:var(--text); position:sticky; top:0; background:var(--panel)}
+    th.sortable{cursor:pointer}
+    th.sortable:focus-visible{outline:2px solid var(--accent-strong); outline-offset:2px}
     .table-zebra tbody tr:nth-child(odd){ background:#1b1b1b }
     .table-zebra tbody tr:nth-child(even){ background:#151515 }
     .table-zebra tbody tr:hover{ background:#1f1f1f }
@@ -384,6 +386,13 @@ const state = {
     produtos: '', investimento: '', imp: '', cliques: '', conv: '', vendas: '', lucro: ''
   },
   derivedAdded: false,
+  tree: {
+    data: [],
+    dimA: '',
+    dimB: '',
+    sortKey: '',
+    sortDir: 'desc'
+  }
 };
 
 // ==========================
@@ -629,7 +638,14 @@ byId('storeMap').addEventListener('click', ()=>{
 });
 
 byId('btnClear').addEventListener('click', ()=>{
-  state.rawRows = []; state.rows = []; state.cols = []; state.meta = {}; state.fileKey=null; state.std={produtos:'',investimento:'',imp:'',cliques:'',conv:'',vendas:'',lucro:''}; state.derivedAdded=false;
+  state.rawRows = [];
+  state.rows = [];
+  state.cols = [];
+  state.meta = {};
+  state.fileKey = null;
+  state.std = {produtos:'',investimento:'',imp:'',cliques:'',conv:'',vendas:'',lucro:''};
+  state.derivedAdded = false;
+  state.tree = {data:[], dimA:'', dimB:'', sortKey:'', sortDir:'desc'};
   byId('file').value = '';
   byId('loadedInfo').textContent = '';
   byId('mapTable').innerHTML = '';
@@ -1145,10 +1161,10 @@ byId('runTree')?.addEventListener('click', ()=>{
   if (!A || !B) return alert('Selecione as duas dimensões.');
   const rows = applyFilterSmart(state.rows, fcol, fval);
   const data = buildTreeAgg(rows, A, B);
-  const sorter = (a,b)=> (dir==='asc'? ( (a[orderBy]||0)-(b[orderBy]||0) ) : ( (b[orderBy]||0)-(a[orderBy]||0) ));
-  data.sort(sorter); for(const n of data){ n.children.sort(sorter); }
-  renderTreeTable(data, A, B);
-  byId('exportTreeCsv').onclick = ()=> exportTreeCsv(data, A, B);
+  state.tree = {data, dimA: A, dimB: B, sortKey: orderBy, sortDir: dir};
+  renderTreeTable();
+  const exportBtn = byId('exportTreeCsv');
+  if (exportBtn) exportBtn.onclick = exportTreeCsv;
 });
 
 function sumBy(rows, col){ return rows.reduce((acc,r)=> acc + (Number(r[col])||0), 0); }
@@ -1216,13 +1232,79 @@ function aggregateBlock(rows, total){
   };
 }
 
-function renderTreeTable(data, A, B){
+function treeSortTarget(sortKey){
+  return sortKey === 'Dimensão' ? 'key' : sortKey;
+}
+
+function buildTreeComparator(sortKey, dir){
+  if (sortKey === 'key'){
+    const direction = dir === 'asc' ? 1 : -1;
+    return (a, b)=> a.key.localeCompare(b.key, state.locale, {sensitivity:'base'}) * direction;
+  }
+  return (a, b)=>{
+    const va = Number(a[sortKey]);
+    const vb = Number(b[sortKey]);
+    const aValid = Number.isFinite(va);
+    const bValid = Number.isFinite(vb);
+    if (!aValid && !bValid){
+      return a.key.localeCompare(b.key, state.locale, {sensitivity:'base'});
+    }
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return a.key.localeCompare(b.key, state.locale, {sensitivity:'base'});
+  };
+}
+
+function sortTreeData(nodes, sortKey, dir){
+  const comparator = buildTreeComparator(sortKey, dir);
+  nodes.sort(comparator);
+  for (const node of nodes){
+    node.children.sort(comparator);
+  }
+}
+
+function renderTreeTable(){
+  const area = byId('treeArea');
+  if (!area) return;
+  const tree = state.tree || {};
+  const data = Array.isArray(tree.data) ? tree.data : [];
   const headers = ['Dimensão','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
   const fmt = {
     'Produtos':'number','% prod.':'percent','Investimento':'currency','% inv.':'percent','CPM':'currency','Impressões':'number','CTR':'percent','Cliques':'number','CPC':'currency','Taxa de conv':'percent','Vendas':'currency','%':'percent','ROAS':'number','Ticket médio':'currency','Lucro':'currency','Média de invest. por prod.':'currency','Média de Custo / Produto':'percent'
   };
+  if (!data.length){
+    area.innerHTML = '<div class="note">Nenhum dado encontrado para os filtros atuais.</div>';
+    return;
+  }
   const numericHeaders = new Set(headers.slice(1));
-  let html = '<div class="scroll"><table class="table-zebra"><thead><tr>' + headers.map((h,i)=>`<th${i>0? ' class="num"':''}>${h}</th>`).join('') + '</tr></thead><tbody>';
+  const currentSortKey = (tree.sortKey && headers.includes(tree.sortKey)) ? tree.sortKey : 'Produtos';
+  const currentSortDir = tree.sortDir === 'asc' ? 'asc' : 'desc';
+  tree.sortKey = currentSortKey;
+  tree.sortDir = currentSortDir;
+  sortTreeData(data, treeSortTarget(currentSortKey), currentSortDir);
+  const headerRow = headers.map((h,i)=>{
+    const sortable = h === 'Dimensão' || numericHeaders.has(h);
+    const isActive = h === currentSortKey;
+    const indicator = isActive ? (currentSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    const classes = [];
+    if (i>0) classes.push('num');
+    if (sortable) classes.push('sortable');
+    const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
+    const attrs = [];
+    if (sortable){
+      attrs.push(`data-sort-key="${h}"`);
+      attrs.push('role="button"');
+      attrs.push('tabindex="0"');
+      attrs.push(`aria-sort="${isActive ? (currentSortDir === 'asc' ? 'ascending' : 'descending') : 'none'}"`);
+    }
+    const attrStr = attrs.length ? ' ' + attrs.join(' ') : '';
+    return `<th${classAttr}${attrStr}>${h}${indicator}</th>`;
+  }).join('');
+  const A = tree.dimA || '';
+  const B = tree.dimB || '';
+  let html = `<div class="scroll"><table class="table-zebra"><thead><tr>${headerRow}</tr></thead><tbody>`;
   for (const node of data){
     const rowA = [ `<strong>${escapeHtml(A)}: ${escapeHtml(node.key)}</strong>`, ...headers.slice(1).map(h=> formatValue(node[h], fmt[h])) ];
     html += '<tr class="row-a">' + rowA.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
@@ -1232,16 +1314,71 @@ function renderTreeTable(data, A, B){
     }
   }
   html += '</tbody></table></div>';
-  byId('treeArea').innerHTML = html;
+  area.innerHTML = html;
+  area.querySelectorAll('th[data-sort-key]').forEach(th=>{
+    const key = th.getAttribute('data-sort-key');
+    th.addEventListener('click', ()=> handleTreeSort(key));
+    th.addEventListener('keydown', e=>{
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        handleTreeSort(key);
+      }
+    });
+  });
 }
 
-function exportTreeCsv(data, A, B){
+function handleTreeSort(header){
+  if (!state.tree || !Array.isArray(state.tree.data) || !state.tree.data.length) return;
+  const prevKey = state.tree.sortKey;
+  let dir;
+  if (header === prevKey){
+    dir = state.tree.sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    dir = header === 'Dimensão' ? 'asc' : 'desc';
+  }
+  state.tree.sortKey = header;
+  state.tree.sortDir = dir;
+  renderTreeTable();
+}
+
+function exportTreeCsv(){
+  if (!state.tree || !Array.isArray(state.tree.data) || !state.tree.data.length){
+    alert('Gere a tabela aninhada antes de exportar.');
+    return;
+  }
+  const {data, dimA: A = '', dimB: B = '', sortKey, sortDir} = state.tree;
+  sortTreeData(data, treeSortTarget(sortKey || 'Produtos'), sortDir === 'asc' ? 'asc' : 'desc');
   const headers = ['Nivel','Chave','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
   let csv = headers.join(',')+'\n';
-  const toRow = (lvl, key, obj)=> [lvl,`"${key.replaceAll('"','""')}"`,obj['Produtos'],obj['% prod.'],obj['Investimento'],obj['% inv.'],obj['CPM'],obj['Impressões'],obj['CTR'],obj['Cliques'],obj['CPC'],obj['Taxa de conv'],obj['Vendas'],obj['%'],obj['ROAS'],obj['Ticket médio'],obj['Lucro'],obj['Média de invest. por prod.'],obj['Média de Custo / Produto']].join(',');
+  const toRow = (lvl, key, obj)=>{
+    const keyStr = String(key ?? '');
+    return [
+      lvl,
+      `"${keyStr.replaceAll('"','""')}"`,
+      obj['Produtos'],
+      obj['% prod.'],
+      obj['Investimento'],
+      obj['% inv.'],
+      obj['CPM'],
+      obj['Impressões'],
+      obj['CTR'],
+      obj['Cliques'],
+      obj['CPC'],
+      obj['Taxa de conv'],
+      obj['Vendas'],
+      obj['%'],
+      obj['ROAS'],
+      obj['Ticket médio'],
+      obj['Lucro'],
+      obj['Média de invest. por prod.'],
+      obj['Média de Custo / Produto']
+    ].join(',');
+  };
   for (const node of data){
     csv += toRow('A:'+A, node.key, node) + '\n';
-    for (const ch of node.children){ csv += toRow('B:'+B, ch.key, ch) + '\n'; }
+    for (const ch of node.children){
+      csv += toRow('B:'+B, ch.key, ch) + '\n';
+    }
   }
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
