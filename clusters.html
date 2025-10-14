@@ -78,6 +78,8 @@
     td.dim{ white-space:nowrap }
     .row-a td:first-child{ font-weight:700 }
     .row-b td:first-child{ padding-left:16px }
+    .row-total td{ font-weight:700; border-top:1px solid var(--border); background:#1b1b1b }
+    .row-total td.dim{ padding-left:0 }
     .tag{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;background:var(--surface)}
     .tag.dim{background:rgba(142,136,129,0.16)}
     .tag.met{background:rgba(88,85,79,0.26)}
@@ -388,6 +390,7 @@ const state = {
   derivedAdded: false,
   tree: {
     data: [],
+    summary: null,
     dimA: '',
     dimB: '',
     sortKey: '',
@@ -645,7 +648,7 @@ byId('btnClear').addEventListener('click', ()=>{
   state.fileKey = null;
   state.std = {produtos:'',investimento:'',imp:'',cliques:'',conv:'',vendas:'',lucro:''};
   state.derivedAdded = false;
-  state.tree = {data:[], dimA:'', dimB:'', sortKey:'', sortDir:'desc'};
+  state.tree = {data:[], summary:null, dimA:'', dimB:'', sortKey:'', sortDir:'desc'};
   byId('file').value = '';
   byId('loadedInfo').textContent = '';
   byId('mapTable').innerHTML = '';
@@ -676,7 +679,7 @@ function populateSelectors(){
   fillSelect('inDim', dims);
   fillSelect('inMetric', mets);
   fillSelect('inFilterCol', mets.concat(dims));
-  fillSelect('treeOrderBy', ['Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto']);
+  fillSelect('treeOrderBy', ['Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','Conversões','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto']);
   // Tabela aninhada: preencher selects de dimensões e filtro
   fillSelect('treeDimA', dims);
   fillSelect('treeDimB', dims);
@@ -1160,8 +1163,8 @@ byId('runTree')?.addEventListener('click', ()=>{
   const dir = byId('treeOrderDir').value || 'desc';
   if (!A || !B) return alert('Selecione as duas dimensões.');
   const rows = applyFilterSmart(state.rows, fcol, fval);
-  const data = buildTreeAgg(rows, A, B);
-  state.tree = {data, dimA: A, dimB: B, sortKey: orderBy, sortDir: dir};
+  const {nodes, summary} = buildTreeAgg(rows, A, B);
+  state.tree = {data: nodes, summary, dimA: A, dimB: B, sortKey: orderBy, sortDir: dir};
   renderTreeTable();
   const exportBtn = byId('exportTreeCsv');
   if (exportBtn) exportBtn.onclick = exportTreeCsv;
@@ -1171,7 +1174,7 @@ function sumBy(rows, col){ return rows.reduce((acc,r)=> acc + (Number(r[col])||0
 function countDistinctBy(rows, col){ const s=new Set(); for(const r of rows){ s.add(String(r[col]??'')); } return s.size; }
 function buildTreeAgg(rows, A, B){
   const S = state.std;
-  const groupsA = groupBy(rows, r=> String(r[A]??'')); 
+  const groupsA = groupBy(rows, r=> String(r[A]??''));
   // Total de produtos depende do tipo da coluna mapeada
   const prodIsMetric = S.produtos && state.meta[S.produtos]?.role === 'metric';
   const total = {
@@ -1179,6 +1182,7 @@ function buildTreeAgg(rows, A, B){
     investimento: S.investimento? sumBy(rows, S.investimento): 0,
     vendas: S.vendas? sumBy(rows, S.vendas): 0
   };
+  const summary = aggregateBlock(rows, total);
   const result = [];
   for (const [aKey, arrA] of groupsA){
     const aggA = aggregateBlock(arrA, total);
@@ -1189,8 +1193,8 @@ function buildTreeAgg(rows, A, B){
       result[result.length-1].children.push({ level:'B', key:bKey, ...aggB });
     }
   }
-  return result;
-} 
+  return {nodes: result, summary};
+}
 
 function aggregateBlock(rows, total){
   const S = state.std;
@@ -1220,6 +1224,7 @@ function aggregateBlock(rows, total){
     'Impressões': impr,
     'CTR': safeDiv(clk, impr),
     'Cliques': clk,
+    'Conversões': conv,
     'CPC': safeDiv(spend, clk),
     'Taxa de conv': safeDiv(conv, clk),
     'Vendas': rev,
@@ -1270,9 +1275,10 @@ function renderTreeTable(){
   if (!area) return;
   const tree = state.tree || {};
   const data = Array.isArray(tree.data) ? tree.data : [];
-  const headers = ['Dimensão','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
+  const summary = tree.summary || null;
+  const headers = ['Dimensão','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','Conversões','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
   const fmt = {
-    'Produtos':'number','% prod.':'percent','Investimento':'currency','% inv.':'percent','CPM':'currency','Impressões':'number','CTR':'percent','Cliques':'number','CPC':'currency','Taxa de conv':'percent','Vendas':'currency','%':'percent','ROAS':'number','Ticket médio':'currency','Lucro':'currency','Média de invest. por prod.':'currency','Média de Custo / Produto':'percent'
+    'Produtos':'number','% prod.':'percent','Investimento':'currency','% inv.':'percent','CPM':'currency','Impressões':'number','CTR':'percent','Cliques':'number','Conversões':'number','CPC':'currency','Taxa de conv':'percent','Vendas':'currency','%':'percent','ROAS':'number','Ticket médio':'currency','Lucro':'currency','Média de invest. por prod.':'currency','Média de Custo / Produto':'percent'
   };
   if (!data.length){
     area.innerHTML = '<div class="note">Nenhum dado encontrado para os filtros atuais.</div>';
@@ -1313,6 +1319,10 @@ function renderTreeTable(){
       html += '<tr class="row-b">' + rowB.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
     }
   }
+  if (summary){
+    const totalRow = [ '<strong>Total geral</strong>', ...headers.slice(1).map(h=> formatValue(summary[h], fmt[h])) ];
+    html += '<tr class="row-total">' + totalRow.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
+  }
   html += '</tbody></table></div>';
   area.innerHTML = html;
   area.querySelectorAll('th[data-sort-key]').forEach(th=>{
@@ -1348,7 +1358,7 @@ function exportTreeCsv(){
   }
   const {data, dimA: A = '', dimB: B = '', sortKey, sortDir} = state.tree;
   sortTreeData(data, treeSortTarget(sortKey || 'Produtos'), sortDir === 'asc' ? 'asc' : 'desc');
-  const headers = ['Nivel','Chave','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
+  const headers = ['Nivel','Chave','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','Conversões','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
   let csv = headers.join(',')+'\n';
   const toRow = (lvl, key, obj)=>{
     const keyStr = String(key ?? '');
@@ -1363,6 +1373,7 @@ function exportTreeCsv(){
       obj['Impressões'],
       obj['CTR'],
       obj['Cliques'],
+      obj['Conversões'],
       obj['CPC'],
       obj['Taxa de conv'],
       obj['Vendas'],
@@ -1379,6 +1390,9 @@ function exportTreeCsv(){
     for (const ch of node.children){
       csv += toRow('B:'+B, ch.key, ch) + '\n';
     }
+  }
+  if (state.tree.summary){
+    csv += toRow('TOTAL','Total geral', state.tree.summary) + '\n';
   }
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
