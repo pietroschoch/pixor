@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Octo Correlator — análise visual e correlações</title>
+  <!-- Libs via CDN (somente client-side) -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#171923; --muted:#9aa0aa; --text:#e8ecf1; --accent:#6ee7b7; --accent2:#60a5fa;
+      --red:#ef4444; --amber:#f59e0b; --green:#10b981; --border:#262a36;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:500 14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,"Helvetica Neue",Arial}
+    h1{font-size:20px;margin:0 0 8px}
+    h2{font-size:16px;margin:14px 0 8px}
+    a{color:var(--accent2)}
+    .wrap{max-width:1940px;margin:24px auto;padding:0 16px}
+    .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--panel);padding:12px;border:1px solid var(--border);border-radius:14px}
+    .bar input[type=file]{padding:6px;background:#0b0d12;border:1px dashed var(--border);border-radius:10px}
+    .row{display:flex;gap:16px;margin-top:16px}
+    .col{flex:1}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
+    .muted{color:var(--muted)}
+    select, input[type=number], input[type=text], button{background:#0b0d12;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+    button{cursor:pointer}
+    /* Botões: primários brancos, secundários escuros */
+    button.primary{background:#ffffff; color:#0b0d12; border:1px solid #e5e7eb; font-weight:700}
+    .btns button:not(.primary){background:#0b0d12; color:var(--text); border:1px solid var(--border)}
+    .grid{display:grid; gap:8px}
+    .grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .grid.cols-6{grid-template-columns:repeat(6,minmax(0,1fr))}
+    .scroll{overflow:auto; max-height:360px; border:1px solid var(--border); border-radius:12px}
+    /* Tabela aninhada mais alta */
+    #treeArea .scroll{max-height:720px}
+    table{width:100%; border-collapse:collapse; min-width:720px}
+    th,td{padding:8px 10px; border-bottom:1px solid var(--border)}
+    th{text-align:left; color:#cbd5e1; position:sticky; top:0; background:var(--panel)}
+    /* Tabela (UX): zebra, hover e alinhamento numérico */
+    .table-zebra tbody tr:nth-child(odd){ background:#0e111a }
+    .table-zebra tbody tr:nth-child(even){ background:#0b0d12 }
+    .table-zebra tbody tr:hover{ background:#151a28 }
+    td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums }
+    td.dim{ white-space:nowrap }
+    .row-a td:first-child{ font-weight:700 }
+    .row-b td:first-child{ padding-left:16px }
+    .tag{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
+    .tag.dim{background:#121520}
+    .tag.met{background:#101b14}
+    details{background:#0b0d12;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .pill{display:inline-block;border:1px solid var(--border);padding:6px 10px;border-radius:999px}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .note{font-size:12px;color:#a6adbb}
+    .hl{color:var(--accent)}
+    .warn{color:var(--amber)}
+    .danger{color:var(--red)}
+    .success{color:var(--green)}
+    .footer{margin:18px 0 8px; font-size:12px; color:var(--muted)}
+    .btns{display:flex; gap:8px; flex-wrap:wrap} 
+    .tabbar{display:flex; gap:6px; margin:8px 0}
+    .tabbar button{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:#0b0d12}
+    .tabbar button.active{background:linear-gradient(135deg,#111827,#0b0d12); border-color:#334155}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Octo Correlator <span class="muted">— análise visual & correlações</span></h1>
+    <div class="bar">
+      <input id="file" type="file" accept=".csv,.xlsx,.xls" />
+      <label class="pill">Separador CSV:
+        <select id="csvDelim">
+          <option value="," selected>Vírgula ,</option>
+          <option value=";">Ponto-e-vírgula ;</option>
+          <option value="\t">Tab</option>
+        </select>
+      </label>
+      <label class="pill">Formato numérico:
+        <select id="locale">
+          <option value="pt-BR" selected>pt‑BR (1.234,56 / R$ / %)</option>
+          <option value="en-US">en‑US (1,234.56 / $ / %)</option>
+        </select>
+      </label>
+      <button id="btnClear">Limpar dataset</button>
+      <div id="loadedInfo" class="muted"></div>
+    </div>
+
+    <details style="margin-top:12px" open>
+      <summary><strong>1) Mapeamento de colunas</strong> — defina Dimensões (texto) e Métricas (números)</summary>
+      <div id="mapArea" class="panel" style="margin-top:8px">
+        <div class="note">Detectamos tipos automaticamente (pt‑BR). Você pode ajustar o papel (Dimensão/Métrica/ignorar) e o formato de exibição para métricas.</div>
+        <div id="mapTable" class="scroll" style="margin-top:10px"></div>
+        <div class="btns" style="margin-top:10px">
+          <button id="saveMap" class="primary">Aplicar mapeamento</button>
+          <button id="storeMap">Salvar preferências (local)</button>
+          <button id="downloadMap">Baixar mapeamento</button>
+          <label class="pill">Carregar
+            <input id="uploadMap" type="file" accept="application/json" />
+          </label>
+          <span id="mapStatus" class="muted"></span>
+        </div>
+      </div>
+    </details>
+
+    <details style="margin-top:12px" open>
+      <summary><strong>2) Construtor de Métricas</strong> — aponte colunas‑base (Investimento, Impressões, etc.) e geramos métricas derivadas (CPM, CTR, CPC, ROAS…)</summary>
+      <div class="panel" style="margin-top:8px">
+        <div class="grid cols-6">
+          <label>Produtos
+            <select id="mapProd"></select>
+          </label>
+          <label>Investimento
+            <select id="mapSpend"></select>
+          </label>
+          <label>Impressões
+            <select id="mapImpr"></select>
+          </label>
+          <label>Cliques
+            <select id="mapClicks"></select>
+          </label>
+          <label>Conversões
+            <select id="mapConv"></select>
+          </label>
+          <label>Vendas (valor)
+            <select id="mapRev"></select>
+          </label>
+          <label>Lucro (opcional)
+            <select id="mapProfit"></select>
+          </label>
+          <label class="pill"><input id="optProfitFallback" type="checkbox" checked> Se não houver lucro, usar <em>Vendas − Investimento</em></label>
+        </div>
+        <div class="btns" style="margin-top:10px">
+          <button id="applyStdMap" class="primary">Gerar/atualizar métricas derivadas</button>
+          <span class="note">Campos derivados: <code>CPM</code>, <code>CTR</code>, <code>CPC</code>, <code>Taxa de conv</code>, <code>ROAS</code>, <code>Ticket médio</code>, <code>Média de invest. por prod.</code>, <code>Média de Custo / Produto</code>.</span>
+        </div>
+        <div id="stdMapStatus" class="note" style="margin-top:6px"></div>
+      </div>
+    </details>
+
+    <details style="margin-top:12px" open>
+      <summary><strong>3) Visualizações</strong> — Heatmap, Dispersão, Matriz e Insights</summary>
+      <div class="panel" style="margin-top:8px">
+        <div class="tabbar">
+          <button class="active" data-tab="heat">Pivot Heatmap</button>
+          <button data-tab="scatter">Dispersão</button>
+          <button data-tab="matrix">Matriz</button>
+          <button data-tab="insights">Auto‑insights</button>
+        </div>
+
+        <div id="tab-heat">
+          <div class="grid cols-6">
+            <label>Dimensão A
+              <select id="heatDimA"></select>
+            </label>
+            <label>Dimensão B
+              <select id="heatDimB"></select>
+            </label>
+            <label>Métrica
+              <select id="heatMetric"></select>
+            </label>
+            <label>Agregador
+              <select id="heatAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option><option value="count">count</option><option value="countDistinct">countDistinct</option></select>
+            </label>
+            <label>Filtro (coluna)
+              <select id="heatFilterCol"></select>
+            </label>
+            <label>Filtro (valor/padrão)
+              <input id="heatFilterVal" type="text" placeholder="Ex.: Cluster=Core, Impressões>=50000, CTR>=2%" />
+            </label>
+          </div>
+          <div class="btns" style="margin-top:10px">
+            <button id="runHeat" class="primary">Gerar heatmap</button>
+            <button id="clearHeatFilter">Limpar filtro</button>
+            <button id="exportHeatCsv">Exportar CSV</button>
+          </div>
+          <div id="heatInfo" class="note" style="margin-top:8px"></div>
+          <div id="heatChart" style="margin-top:10px"></div>
+        </div>
+
+        <div id="tab-scatter" class="hidden">
+          <div class="grid cols-6">
+            <label>X (métrica)
+              <select id="scX"></select>
+            </label>
+            <label>Y (métrica)
+              <select id="scY"></select>
+            </label>
+            <label>Cor (dimensão)
+              <select id="scColor"></select>
+            </label>
+            <label>Tamanho (métrica)
+              <select id="scSize"></select>
+            </label>
+            <label>Filtro (coluna)
+              <select id="scFilterCol"></select>
+            </label>
+            <label>Filtro (valor/padrão)
+              <input id="scFilterVal" type="text" placeholder="Ex.: Categoria=Shoes, Cliques>=1000" />
+            </label>
+          </div>
+          <div class="btns" style="margin-top:10px">
+            <button id="runScatter" class="primary">Gerar dispersão</button>
+            <button id="clearScatterFilter">Limpar filtro</button>
+          </div>
+          <div id="scInfo" class="note" style="margin-top:8px"></div>
+          <div id="scatterChart" style="margin-top:10px"></div>
+        </div>
+
+        <div id="tab-matrix" class="hidden">
+          <div class="grid cols-6">
+            <label>Métricas (CTRL/CMD para múltiplas)
+              <select id="mxMetrics" multiple size="8"></select>
+            </label>
+          </div>
+          <div class="btns" style="margin-top:10px">
+            <button id="runMatrix" class="primary">Gerar matriz</button>
+            <button id="clearMatrixSel">Limpar seleção</button>
+          </div>
+          <div id="matrixChart" style="margin-top:10px"></div>
+        </div>
+
+        <div id="tab-insights" class="hidden">
+          <div class="grid cols-6">
+            <label>Dimensão
+              <select id="inDim"></select>
+            </label>
+            <label>Métrica
+              <select id="inMetric"></select>
+            </label>
+            <label>Agregador
+              <select id="inAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option></select>
+            </label>
+            <label>Top N
+              <input id="inTopN" type="number" value="5" min="1" />
+            </label>
+            <label>Filtro (coluna)
+              <select id="inFilterCol"></select>
+            </label>
+            <label>Filtro (valor/padrão)
+              <input id="inFilterVal" type="text" placeholder="Ex.: ROAS>=2, Cluster=Core" />
+            </label>
+          </div>
+          <div class="btns" style="margin-top:10px">
+            <button id="runInsights" class="primary">Rodar insights</button>
+            <button id="clearInsightsFilter">Limpar filtro</button>
+          </div>
+          <div id="insightsArea" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </details>
+
+    <details style="margin-top:12px" open>
+      <summary><strong>4) Tabela aninhada</strong> — selecione 2 dimensões (ex.: Cluster → Categoria) e visualize todas as métricas agregadas</summary>
+      <div class="panel" style="margin-top:8px">
+        <div class="grid cols-6">
+          <label>Dimensão Pai (nível 1)
+            <select id="treeDimA"></select>
+          </label>
+          <label>Dimensão Filha (nível 2)
+            <select id="treeDimB"></select>
+          </label>
+          <label>Filtro (coluna)
+            <select id="treeFilterCol"></select>
+          </label>
+          <label>Filtro (valor/padrão)
+            <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
+          </label>
+          <label>Ordenar por
+            <select id="treeOrderBy"></select>
+          </label>
+          <label>Ordem
+            <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
+          </label>
+        </div>
+        <div class="btns" style="margin-top:10px">
+          <button id="runTree" class="primary">Gerar tabela</button>
+          <button id="exportTreeCsv">Exportar CSV</button>
+        </div>
+        <div id="treeArea" style="margin-top:10px"></div>
+      </div>
+    </details>
+
+    <details style="margin-top:12px">
+      <summary><strong>Ajuda rápida</strong></summary>
+      <div class="panel" style="margin-top:8px">
+        <ul>
+          <li>Faça upload de <strong>CSV</strong> (pt‑BR ou en‑US) ou <strong>Excel</strong> (primeira planilha).</li>
+          <li>Revise o <strong>mapeamento</strong>: marque cada coluna como <span class="tag dim">Dimensão</span> (texto) ou <span class="tag met">Métrica</span> (número). Colunas em branco/ajuda podem ser <em>ignoradas</em>.</li>
+          <li>No Pivot Heatmap, escolha <em>Dimensão A</em>, <em>Dimensão B</em>, <em>Métrica</em> e um <em>agregador</em> (ex.: <code>mean</code> de ROAS por <code>Cluster × Categoria</code>).</li>
+          <li>Em Dispersão, selecione duas métricas e veja o <strong>r de Pearson</strong> para avaliar correlação linear.</li>
+          <li>Na Matriz, gere o mapa de correlação entre várias métricas de uma vez.</li>
+          <li>Em Auto‑insights, liste Top/Bottom por dimensão com filtros mínimos (ex.: <code>Impressões ≥ 50.000</code>).</li>
+        </ul>
+        <div class="note">Tudo roda 100% no navegador. O mapeamento pode ser salvo no seu <em>localStorage</em>.</div>
+      </div>
+    </details>
+
+    <div class="footer">Feito para OctoShop · v1.1 — <span class="muted">HTML + JS puro (Plotly, PapaParse, SheetJS)</span></div>
+  </div>
+
+<script>
+// ==========================
+// Utilidades numéricas/pt-BR
+// ==========================
+const state = {
+  rawRows: [],      // linhas originais (strings)
+  rows: [],         // linhas normalizadas (números)
+  cols: [],         // nomes
+  meta: {},         // meta por coluna: { role: 'dimension'|'metric'|'ignore', fmt: 'number'|'currency'|'percent'|'text' }
+  fileKey: null,    // assinatura do dataset para salvar mapping
+  locale: 'pt-BR',
+  std: {            // mapeamento de campos-padrão
+    produtos: '', investimento: '', imp: '', cliques: '', conv: '', vendas: '', lucro: ''
+  },
+  derivedAdded: false,
+};
+
+// ==========================
+// Tema/estilo Plotly (alto contraste)
+// ==========================
+const PLOTLY_THEME = {
+  fontColor: '#ffffff',
+  axisColor: '#ffffff',
+  gridColor: '#3a4155',
+  zeroLineColor: '#6b7280',
+  paperBg: 'rgba(0,0,0,0)',
+  plotBg: 'rgba(0,0,0,0)',
+  hoverBg: '#111827',
+  hoverBorder: '#374151',
+  colorway: ['#60a5fa','#f59e0b','#10b981','#ef4444','#a78bfa','#f472b6','#22d3ee']
+};
+
+function baseLayout(overrides={}){
+  return Object.assign({
+    paper_bgcolor: PLOTLY_THEME.paperBg,
+    plot_bgcolor: PLOTLY_THEME.plotBg,
+    margin: {l:60,r:10,t:30,b:60},
+    font: {color: PLOTLY_THEME.fontColor},
+    xaxis: {color: PLOTLY_THEME.axisColor, gridcolor: PLOTLY_THEME.gridColor, zerolinecolor: PLOTLY_THEME.zeroLineColor, automargin:true},
+    yaxis: {color: PLOTLY_THEME.axisColor, gridcolor: PLOTLY_THEME.gridColor, zerolinecolor: PLOTLY_THEME.zeroLineColor, automargin:true},
+    hoverlabel: {bgcolor: PLOTLY_THEME.hoverBg, bordercolor: PLOTLY_THEME.hoverBorder, font:{color:PLOTLY_THEME.fontColor}},
+    colorway: PLOTLY_THEME.colorway
+  }, overrides);
+}
+
+const byId = id => document.getElementById(id);
+function getValue(id){ return byId(id)?.value || ''; }
+
+function parseNumberLocale(v, locale){
+  if (v == null) return NaN;
+  if (typeof v === 'number') return v;
+  v = String(v).trim();
+  if (!v) return NaN;
+  // Detect percent
+  const isPct = /%/.test(v);
+  // Remove currency symbols and spaces
+  v = v.replace(/\s|R\$|\$/g, '');
+  // Handle locale
+  if (locale === 'pt-BR'){
+    // Remove thousand dots, swap comma to dot
+    v = v.replace(/\./g, '').replace(/,/g, '.');
+  } else {
+    // en-US already dot decimal; remove commas
+    v = v.replace(/,/g, '');
+  }
+  // Remove any stray %
+  v = v.replace(/%/g, '');
+  const n = Number(v);
+  if (!isFinite(n)) return NaN;
+  return isPct ? n / 100 : n;
+}
+
+function inferType(samples, locale){
+  let numericCount = 0, pctCount = 0, currencyCount = 0;
+  for (const s of samples){
+    if (s == null || String(s).trim()==='') continue;
+    const hasPct = /%/.test(String(s));
+    const hasCur = /R\$|\$/.test(String(s));
+    const n = parseNumberLocale(s, locale);
+    if (!isNaN(n)) numericCount++;
+    if (hasPct) pctCount++;
+    if (hasCur) currencyCount++; 
+  }
+  if (numericCount >= samples.length * 0.6){
+    // metric inferred
+    const fmt = pctCount > currencyCount ? 'percent' : (currencyCount>0 ? 'currency' : 'number');
+    return {role:'metric', fmt};
+  }
+  return {role:'dimension', fmt:'text'};
+}
+
+function formatValue(n, fmt){
+  if (!isFinite(n)) return '';
+  if (fmt==='percent') return new Intl.NumberFormat(state.locale,{style:'percent',maximumFractionDigits:2}).format(n);
+  if (fmt==='currency') return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:2}).format(n);
+  return new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(n);
+}
+function safeDiv(a,b){ return (isFinite(a) && isFinite(b) && b!==0) ? (a/b) : NaN; }
+
+// ==========================
+// Carregar arquivo (CSV/Excel)
+// ==========================
+byId('file').addEventListener('change', async (e)=>{
+  console.log('[file/change] start');
+  const f = e.target.files[0];
+  if (!f) return;
+  state.locale = byId('locale').value;
+  const ext = f.name.split('.').pop().toLowerCase();
+  state.fileKey = f.name;
+  byId('loadedInfo').textContent = 'Lendo…';
+  try{
+    let rows = [];
+    if (ext==='csv' || ext==='txt'){
+      const delim = byId('csvDelim').value;
+      rows = await parseCSVFile(f, delim);
+    } else {
+      rows = await parseExcelFile(f);
+    }
+    if (!rows.length) throw new Error('Planilha vazia');
+    console.log('[file/change] parsed rows:', rows.length);
+    state.rawRows = rows;
+    state.cols = Object.keys(rows[0]||{});
+    // Infer types
+    state.meta = {};
+    for (const c of state.cols){
+      const samples = rows.slice(0, 50).map(r=>r[c]).filter(v=>v!==undefined);
+      state.meta[c] = inferType(samples, state.locale);
+    }
+    console.log('[file/change] inferred meta:', state.meta);
+    // Tentar carregar mapeamento salvo localmente (compat c/ versões)
+    tryLoadLocalMapping();
+    guessStdMapping();
+    normalizeRows();
+    renderMapTable();
+    populateStdSelectors();
+    autoBuildIfReady();
+    byId('loadedInfo').textContent = `Carregado: ${f.name} · ${rows.length} linhas · ${state.cols.length} colunas.`;
+    populateSelectors();
+  }catch(err){
+    console.error(err);
+    byId('loadedInfo').textContent = `Erro: ${err.message}`;
+  }
+});
+
+function parseCSVFile(file, delimiter){
+  return new Promise((resolve,reject)=>{
+    Papa.parse(file,{
+      header:true, skipEmptyLines:true, delimiter,
+      complete:(res)=> resolve(res.data),
+      error:reject
+    });
+  });
+}
+
+function parseExcelFile(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data,{type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]]; // primeira aba
+        const json = XLSX.utils.sheet_to_json(ws,{defval:''});
+        resolve(json);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function normalizeRows(){
+  const loc = state.locale;
+  state.rows = state.rawRows.map(r=>{
+    const out = {};
+    for (const c of state.cols){
+      const meta = state.meta[c] || {role:'dimension', fmt:'text'};
+      if (meta.role==='metric'){
+        out[c] = parseNumberLocale(r[c], loc);
+      } else {
+        out[c] = (r[c]==null? '': String(r[c]).trim());
+      }
+    }
+    return out;
+  });
+}
+
+// ==========================
+// UI: Mapeamento
+// ==========================
+function renderMapTable(){
+  const wrap = byId('mapTable');
+  if (!state.cols.length){ wrap.innerHTML = '<div class="muted">Nenhum dataset carregado.</div>'; return; }
+  let html = '<table><thead><tr><th>Coluna</th><th>Papel</th><th>Formato</th><th>Exemplo</th></tr></thead><tbody>';
+  for (const c of state.cols){
+    const m = state.meta[c];
+    const first = state.rawRows.find(r=>r[c]!==undefined && String(r[c]).trim()!=='');
+    const sample = first? String(first[c]).substring(0,80): '';
+    html += `<tr>
+      <td><strong>${escapeHtml(c)}</strong></td>
+      <td>
+        <select data-col="${escapeHtml(c)}" class="roleSel">
+          <option value="dimension" ${m.role==='dimension'? 'selected':''}>Dimensão</option>
+          <option value="metric" ${m.role==='metric'? 'selected':''}>Métrica</option>
+          <option value="ignore" ${m.role==='ignore'? 'selected':''}>Ignorar</option>
+        </select>
+      </td>
+      <td>
+        <select data-col="${escapeHtml(c)}" class="fmtSel">
+          <option value="text" ${m.fmt==='text'? 'selected':''}>Texto</option>
+          <option value="number" ${m.fmt==='number'? 'selected':''}>Número</option>
+          <option value="currency" ${m.fmt==='currency'? 'selected':''}>Moeda</option>
+          <option value="percent" ${m.fmt==='percent'? 'selected':''}>Percentual</option>
+        </select>
+      </td>
+      <td class="muted">${escapeHtml(sample)}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  // Hooks
+  wrap.querySelectorAll('.roleSel').forEach(sel=> sel.addEventListener('change', e=>{
+    const col = e.target.getAttribute('data-col');
+    state.meta[col].role = e.target.value;
+  }));
+  wrap.querySelectorAll('.fmtSel').forEach(sel=> sel.addEventListener('change', e=>{
+    const col = e.target.getAttribute('data-col');
+    state.meta[col].fmt = e.target.value;
+  }));
+}
+
+byId('saveMap').addEventListener('click', ()=>{
+  console.log('[saveMap/click] applying mapping');
+  normalizeRows();
+  populateStdSelectors();
+  autoBuildIfReady();
+  populateSelectors();
+  byId('mapStatus').textContent = 'Mapeamento aplicado.';
+  setTimeout(()=> byId('mapStatus').textContent = '', 2000);
+});
+
+byId('storeMap').addEventListener('click', ()=>{
+  if (!state.fileKey){ byId('mapStatus').textContent = 'Nenhum arquivo carregado.'; return; }
+  const key = buildMappingKey();
+  localStorage.setItem(key, JSON.stringify(currentMappingPayload()));
+  byId('mapStatus').textContent = 'Preferências salvas localmente.';
+  setTimeout(()=> byId('mapStatus').textContent = '', 2000);
+});
+
+byId('btnClear').addEventListener('click', ()=>{
+  state.rawRows = []; state.rows = []; state.cols = []; state.meta = {}; state.fileKey=null; state.std={produtos:'',investimento:'',imp:'',cliques:'',conv:'',vendas:'',lucro:''}; state.derivedAdded=false;
+  byId('file').value = '';
+  byId('loadedInfo').textContent = '';
+  byId('mapTable').innerHTML = '';
+  ['heatChart','scatterChart','matrixChart','insightsArea','treeArea','heatInfo','scInfo'].forEach(id=>{ const el = byId(id); if (el) { el.innerHTML=''; } else { console.warn('[btnClear] missing element:', id); } });
+  document.querySelectorAll('#heatDimA,#heatDimB,#heatMetric,#heatFilterCol,#scX,#scY,#scColor,#scSize,#scFilterCol,#mxMetrics,#inDim,#inMetric,#inFilterCol,#treeDimA,#treeDimB,#treeFilterCol,#treeOrderBy').forEach(el=>{ if(el){ el.innerHTML=''; } });
+});
+
+// ==========================
+// Seletores / Builder inputs
+// ==========================
+function populateSelectors(){
+  const dims = state.cols.filter(c => state.meta[c]?.role==='dimension');
+  const mets = state.cols.filter(c => state.meta[c]?.role==='metric');
+  console.log('[populateSelectors] dims:', dims.length, 'mets:', mets.length);
+
+  fillSelect('heatDimA', dims);
+  fillSelect('heatDimB', dims);
+  fillSelect('heatMetric', mets);
+  fillSelect('heatFilterCol', mets.concat(dims));
+
+  fillSelect('scX', mets); fillSelect('scY', mets);
+  fillSelect('scColor', ['(nenhum)'].concat(dims));
+  fillSelect('scSize', ['(nenhum)'].concat(mets));
+  fillSelect('scFilterCol', mets.concat(dims));
+
+  fillSelect('mxMetrics', mets, true);
+
+  fillSelect('inDim', dims);
+  fillSelect('inMetric', mets);
+  fillSelect('inFilterCol', mets.concat(dims));
+  fillSelect('treeOrderBy', ['Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto']);
+  // Tabela aninhada: preencher selects de dimensões e filtro
+  fillSelect('treeDimA', dims);
+  fillSelect('treeDimB', dims);
+  fillSelect('treeFilterCol', mets.concat(dims));
+}
+
+function fillSelect(id, items, multiple=false){
+  const el = byId(id);
+  if (!el) return;
+  el.innerHTML = '';
+  if (multiple){
+    for (const it of items){
+      const opt = document.createElement('option');
+      opt.value = it; opt.textContent = it; el.appendChild(opt);
+    }
+  } else {
+    for (const it of items){ 
+      const opt = document.createElement('option');
+      opt.value = it==='(nenhum)'? '': it; opt.textContent = it; el.appendChild(opt);
+    }
+  }
+}
+ 
+// ===== Construtor de Métricas (std mapping)
+function populateStdSelectors(){
+  const options = [''].concat(state.cols);
+  for (const id of ['mapProd','mapSpend','mapImpr','mapClicks','mapConv','mapRev','mapProfit']){
+    const el = byId(id); if(!el) continue; el.innerHTML='';
+    for (const c of options){ const op=document.createElement('option'); op.value=c; op.textContent=c||'(nenhum)'; el.appendChild(op); }
+  }
+  if (state.std.produtos) byId('mapProd').value = state.std.produtos;
+  if (state.std.investimento) byId('mapSpend').value = state.std.investimento;
+  if (state.std.imp) byId('mapImpr').value = state.std.imp;
+  if (state.std.cliques) byId('mapClicks').value = state.std.cliques;
+  if (state.std.conv) byId('mapConv').value = state.std.conv;
+  if (state.std.vendas) byId('mapRev').value = state.std.vendas;
+  if (state.std.lucro) byId('mapProfit').value = state.std.lucro;
+} 
+function guessStdMapping(){
+  const H = (s)=> (s||'').toLowerCase();
+  function findOne(preds){
+    return state.cols.find(c=> preds.some(p=> H(c).includes(p)) ) || '';
+  }
+  state.std.produtos = findOne(['produtos','qtd produto','qtd','itens']);
+  state.std.investimento = findOne(['investimento','custo','gasto','spend']);
+  state.std.imp = findOne(['impress','impr']);
+  state.std.cliques = findOne(['clique','click']);
+  state.std.conv = findOne(['convers','compra','pedido']);
+  state.std.vendas = findOne(['vendas','valor da convers','valor total da compra','receita','revenue']);
+  state.std.lucro = findOne(['lucro','profit']);
+}
+
+byId('applyStdMap').addEventListener('click', ()=>{
+  if (!byId('applyStdMap')) return;
+  state.std.produtos = byId('mapProd').value; 
+  state.std.investimento = byId('mapSpend').value;
+  state.std.imp = byId('mapImpr').value;
+  state.std.cliques = byId('mapClicks').value;
+  state.std.conv = byId('mapConv').value;
+  state.std.vendas = byId('mapRev').value;
+  state.std.lucro = byId('mapProfit').value;
+  buildDerivedMetrics();
+  populateSelectors();
+  byId('stdMapStatus').textContent = 'Métricas derivadas recalculadas.';
+  setTimeout(()=> byId('stdMapStatus').textContent = '', 2000);
+});
+
+// ===== Persistência de mapeamento (local e arquivo)
+function buildMappingKey(){
+  return 'octo-correlator:mapping:'+ (state.fileKey||'') + ':' + state.cols.join('|');
+}
+function currentMappingPayload(){
+  return {meta:state.meta, locale:state.locale, std:state.std, cols:state.cols, fileKey:state.fileKey};
+}
+function applyMappingPayload(payload){
+  if (!payload) return;
+  if (payload.locale) state.locale = payload.locale;
+  if (payload.meta) state.meta = payload.meta;
+  if (payload.std) state.std = payload.std;
+  if (Array.isArray(payload.cols)) state.cols = payload.cols;
+  // Recalcular linhas normalizadas e UI
+  normalizeRows();
+  renderMapTable();
+  populateStdSelectors();
+  autoBuildIfReady();
+  populateSelectors();
+}
+function tryLoadLocalMapping(){
+  try{
+    const key = buildMappingKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const payload = JSON.parse(raw);
+    applyMappingPayload(payload);
+    byId('mapStatus').textContent = 'Mapeamento carregado do armazenamento local.';
+    setTimeout(()=> byId('mapStatus').textContent = '', 2000);
+  }catch(err){ console.warn('[mapping/loadLocal] erro', err); }
+}
+byId('downloadMap')?.addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(currentMappingPayload(), null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = (state.fileKey? state.fileKey.replace(/\.[^.]+$/,'')+'_' : '') + 'mapeamento.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+byId('uploadMap')?.addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const text = await f.text();
+    const payload = JSON.parse(text);
+    applyMappingPayload(payload);
+    byId('mapStatus').textContent = 'Mapeamento importado.';
+    setTimeout(()=> byId('mapStatus').textContent = '', 2000);
+  }catch(err){
+    console.error(err);
+    byId('mapStatus').textContent = 'Falha ao importar mapeamento.';
+    setTimeout(()=> byId('mapStatus').textContent = '', 3000); 
+  }finally{
+    e.target.value = '';
+  }
+});
+
+function ensureMetric(col, fmt='number'){
+  if (!state.meta[col]){ state.meta[col] = {role:'metric', fmt}; state.cols.push(col); }
+}
+function buildDerivedMetrics(){
+  const S = state.std;
+  ensureMetric('CPM');
+  ensureMetric('CTR','percent');
+  ensureMetric('CPC');
+  ensureMetric('Taxa de conv','percent');
+  ensureMetric('ROAS');
+  ensureMetric('Ticket médio','currency');
+  ensureMetric('Média de invest. por prod.','currency');
+  ensureMetric('Média de Custo / Produto','percent');
+  // Marcar como métricas apenas os campos que são de fato numéricos.
+  for (const [alias, col] of Object.entries(S)){
+    if (!col || !state.meta[col]) continue;
+    if (alias === 'produtos') continue; // produtos pode ser dimensão (ex.: nome do produto)
+    state.meta[col].role = 'metric'; 
+  }
+  normalizeRows();
+  const useProfitFallback = byId('optProfitFallback')?.checked ?? true;
+  for (const r of state.rows){
+    const prod = Number(r[S.produtos]);
+    const spend = Number(r[S.investimento]);
+    const imp = Number(r[S.imp]);
+    const clk = Number(r[S.cliques]);
+    const conv = Number(r[S.conv]);
+    const rev = Number(r[S.vendas]);
+    const profit = S.lucro ? Number(r[S.lucro]) : (useProfitFallback? (isFinite(rev)&&isFinite(spend)? rev-spend: NaN) : NaN);
+
+    r['CPM'] = safeDiv(spend, imp) * 1000;
+    r['CTR'] = safeDiv(clk, imp);
+    r['CPC'] = safeDiv(spend, clk);
+    r['Taxa de conv'] = safeDiv(conv, clk);
+    r['ROAS'] = safeDiv(rev, spend);
+    r['Ticket médio'] = safeDiv(rev, conv);
+    r['Média de invest. por prod.'] = safeDiv(spend, prod);
+    const ticket = r['Ticket médio'];
+    r['Média de Custo / Produto'] = safeDiv(r['Média de invest. por prod.'], ticket);
+    if (S.lucro || useProfitFallback){ r['Lucro'] = profit; state.meta['Lucro'] = {role:'metric', fmt:'currency'}; if (!state.cols.includes('Lucro')) state.cols.push('Lucro'); }
+  }
+  state.derivedAdded = true;
+}
+function autoBuildIfReady(){
+  const s = state.std;
+  const essentials = [s.investimento,s.imp,s.cliques,s.conv,s.vendas].every(Boolean);
+  if (essentials){ buildDerivedMetrics(); }
+}
+ 
+
+// ==========================
+// PIVOT HEATMAP
+// ==========================
+byId('runHeat')?.addEventListener('click', ()=>{
+  console.log('[heat/run] start');
+  const A = byId('heatDimA').value;
+  const B = byId('heatDimB').value;
+  const M = byId('heatMetric').value;
+  const agg = byId('heatAgg').value;
+  const fcol = byId('heatFilterCol')?.value || '';
+  const fval = byId('heatFilterVal')?.value || '';
+  if (!A || !B || !M) return alert('Selecione A, B e Métrica.');
+  const rows = applyFilterSmart(state.rows, fcol, fval);
+  console.log('[heat/run] rows after filter:', rows.length, {fcol, fval});
+  const {rowsLabel, colsLabel, z, table} = pivot2D(rows, A, B, M, agg);
+  renderHeat(rowsLabel, colsLabel, z, M, agg);
+  // enable CSV export
+  byId('exportHeatCsv').onclick = ()=> exportPivotCsv(rowsLabel, colsLabel, table, `${A}_x_${B}_${M}_${agg}.csv`);
+  byId('heatInfo').innerHTML = `Linhas: <span class="hl">${rows.length}</span> · Células: <span class="hl">${rowsLabel.length}×${colsLabel.length}</span> · Métrica: <code>${M}</code> (${agg}).`;
+});
+
+function applyFilter(rows, col, min){
+  if (!col || isNaN(min)) return rows;
+  return rows.filter(r=>{
+    const val = state.meta[col]?.role==='metric' ? r[col] : String(r[col]).length; // dimensão vira length>0
+    return isFinite(val) && val >= min;
+  });
+}
+
+// Fallback para compatibilidade com chamadas antigas (evitar redeclarar identifiers)
+window.applyFilter = applyFilterSmart;
+window.applyFilterCompat = applyFilterSmart;
+
+function pivot2D(rows, dimA, dimB, metric, agg){
+  const fmt = state.meta[metric]?.fmt||'number';
+  const aSet = new Map(); const bSet = new Map();
+  const groups = new Map();
+  const key = (a,b)=> `${a}\u0001${b}`;
+  for (const r of rows){
+    const a = String(r[dimA]??'');
+    const b = String(r[dimB]??'');
+    const v = Number(r[metric]);
+    if (!isFinite(v)) continue;
+    aSet.set(a,true); bSet.set(b,true);
+    const k = key(a,b);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(v);
+  }
+  const rowsLabel = Array.from(aSet.keys());
+  const colsLabel = Array.from(bSet.keys());
+  const z = []; const table = [];
+  for (const a of rowsLabel){
+    const row = []; const rowRaw=[];
+    for (const b of colsLabel){
+      const arr = groups.get(key(a,b))||[];
+      const val = aggregate(arr, agg);
+      row.push(val);
+      rowRaw.push(val);
+    }
+    z.push(row);
+    table.push(rowRaw);
+  }
+  return {rowsLabel, colsLabel, z, table};
+}
+
+function aggregate(arr, agg){
+  if (!arr.length) return NaN;
+  switch(agg){
+    case 'sum': return arr.reduce((a,b)=>a+b,0);
+    case 'mean': return arr.reduce((a,b)=>a+b,0)/arr.length;
+    case 'median': return quantile(arr, 0.5);
+    case 'min': return Math.min(...arr);
+    case 'max': return Math.max(...arr);
+    case 'count': return arr.length;
+    case 'countDistinct': return new Set(arr).size;
+    default: return arr.reduce((a,b)=>a+b,0)/arr.length;
+  }
+}
+function quantile(arr, p){
+  const a = arr.slice().sort((x,y)=>x-y); const H = (a.length-1)*p; const h = Math.floor(H); const e = H-h; return e===0? a[h] : a[h]*(1-e)+a[h+1]*e;
+}
+
+function renderHeat(rowLabels, colLabels, z, metric, agg){
+  const fmt = state.meta[metric]?.fmt||'number';
+  const text = z.map(row=> row.map(v=> formatValue(v, fmt)));
+  const data = [{
+    z, x: colLabels, y: rowLabels, type:'heatmap', hoverongaps:false,
+    colorscale: 'Viridis',
+    text, texttemplate: '%{text}', textfont:{size:10, color:'#ffffff'},
+    hovertemplate: `${metric} (${agg}): %{text}<extra>%{y} × %{x}</extra>`,
+    colorbar: {tickcolor: '#ffffff', tickfont:{color:'#ffffff'}}
+  }];
+  const layout = baseLayout({
+    margin:{l:100,r:10,t:30,b:60},
+    xaxis:{tickangle:-30, automargin:true, color:PLOTLY_THEME.axisColor, gridcolor:PLOTLY_THEME.gridColor, zerolinecolor:PLOTLY_THEME.zeroLineColor},
+    yaxis:{automargin:true, color:PLOTLY_THEME.axisColor, gridcolor:PLOTLY_THEME.gridColor, zerolinecolor:PLOTLY_THEME.zeroLineColor}
+  });
+  Plotly.newPlot('heatChart', data, layout, {displayModeBar:true, responsive:true});
+}
+
+// Botões utilitários de filtros/seleções
+byId('clearHeatFilter')?.addEventListener('click', ()=>{
+  const fc = byId('heatFilterCol'); const fv = byId('heatFilterVal');
+  if (fc) fc.value = '';
+  if (fv) fv.value = '';
+});
+
+function exportPivotCsv(rowsLabel, colsLabel, table, name){
+  let csv = ['Dimensão', ...colsLabel].join(',') + '\n';
+  for (let i=0;i<rowsLabel.length;i++){
+    csv += [rowsLabel[i], ...table[i]].join(',') + '\n';
+  }
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==========================
+// DISPERSÃO + r de Pearson
+// ==========================
+byId('runScatter')?.addEventListener('click', ()=>{
+  console.log('[scatter/run] start');
+  const X = byId('scX').value; const Y = byId('scY').value;
+  if (!X || !Y) return alert('Selecione X e Y.');
+  const colorCol = byId('scColor').value || null;
+  const sizeCol = byId('scSize').value || null;
+  const fcol = byId('scFilterCol')?.value || '';
+  const fval = byId('scFilterVal')?.value || '';
+  const rows = applyFilterSmart(state.rows, fcol, fval);
+  console.log('[scatter/run] rows after filter:', rows.length, {fcol, fval});
+  const points = rows.filter(r=> isFinite(r[X]) && isFinite(r[Y]));
+  const xs = points.map(r=> r[X]);
+  const ys = points.map(r=> r[Y]);
+  const r = pearson(xs, ys);
+  const trend = linearRegression(xs, ys);
+  // Build traces by color groups
+  let traces = [];
+  if (colorCol){
+    const groups = groupBy(points, p=> String(p[colorCol]??''));
+    for (const [g, arr] of groups){
+      traces.push({
+        x: arr.map(o=>o[X]), y: arr.map(o=>o[Y]),
+        mode:'markers', type:'scatter', name: g || '(vazio)',
+        marker: { size: sizeCol? arr.map(o=> Math.max(4, Math.sqrt(Math.abs(o[sizeCol]||4))) ): 8, sizemode:'area' },
+        text: arr.map(o=> colorCol? String(o[colorCol]) : '')
+      });
+    }
+  } else {
+    traces.push({ x: xs, y: ys, mode:'markers', type:'scatter', name: 'pontos', marker:{size:8} });
+  }
+  // trendline
+  if (isFinite(trend.m) && isFinite(trend.b)){
+    const xMin = Math.min(...xs), xMax = Math.max(...xs);
+    const lineX = [xMin, xMax];
+    const lineY = lineX.map(x=> trend.m*x + trend.b);
+    traces.push({ x: lineX, y: lineY, mode:'lines', name:'tendência', line:{dash:'dash', color:'#ffffff', width:2} });
+  }
+  // Aumenta contraste dos pontos
+  traces = traces.map(tr=> tr.mode==='markers'? ({...tr, marker:{...tr.marker, color:tr.marker?.color, opacity:0.9, line:{width:0.5, color:'#000000'}}}): tr);
+  Plotly.newPlot('scatterChart', traces, baseLayout({
+    xaxis:{title:X, color:PLOTLY_THEME.axisColor, gridcolor:PLOTLY_THEME.gridColor, zerolinecolor:PLOTLY_THEME.zeroLineColor},
+    yaxis:{title:Y, color:PLOTLY_THEME.axisColor, gridcolor:PLOTLY_THEME.gridColor, zerolinecolor:PLOTLY_THEME.zeroLineColor}
+  }), {displayModeBar:true, responsive:true});
+  byId('scInfo').innerHTML = `Amostras: <span class="hl">${xs.length}</span> · r = <strong>${(r).toFixed(3)}</strong> (−1 forte negativo · +1 forte positivo)`;
+});
+byId('clearScatterFilter')?.addEventListener('click', ()=>{
+  const fc = byId('scFilterCol'); const fv = byId('scFilterVal');
+  if (fc) fc.value = '';
+  if (fv) fv.value = '';
+});
+
+function pearson(x, y){
+  const n = Math.min(x.length, y.length);
+  if (n===0) return NaN;
+  const mx = x.reduce((a,b)=>a+b,0)/n; const my = y.reduce((a,b)=>a+b,0)/n;
+  let num=0, sx=0, sy=0;
+  for (let i=0;i<n;i++){
+    const dx = x[i]-mx; const dy = y[i]-my; num += dx*dy; sx += dx*dx; sy += dy*dy;
+  }
+  return num/Math.sqrt(sx*sy);
+}
+function linearRegression(x,y){
+  const n = Math.min(x.length,y.length); if (n<2) return {m:NaN,b:NaN};
+  const mx = x.reduce((a,b)=>a+b,0)/n; const my = y.reduce((a,b)=>a+b,0)/n;
+  let num=0, den=0; for (let i=0;i<n;i++){ num += (x[i]-mx)*(y[i]-my); den += (x[i]-mx)*(x[i]-mx); }
+  const m = num/den; const b = my - m*mx; return {m,b};
+}
+function groupBy(arr, f){
+  const m = new Map(); for (const it of arr){ const k = f(it); if (!m.has(k)) m.set(k,[]); m.get(k).push(it);} return m;
+}
+
+// ==========================
+// MATRIZ DE CORRELAÇÃO
+// ==========================
+byId('runMatrix')?.addEventListener('click', ()=>{
+  console.log('[matrix/run] start');
+  const opts = Array.from(byId('mxMetrics').selectedOptions).map(o=>o.value);
+  if (!opts.length) return alert('Selecione ao menos 2 métricas.');
+  const data = computeCorrelationMatrix(state.rows, opts);
+  console.log('[matrix/run] metrics:', opts);
+  const z = data.matrix; const labels = data.labels;
+  const text = z.map(row=> row.map(v=> (isFinite(v)? v.toFixed(3): '')));
+  Plotly.newPlot('matrixChart', [{
+    z, x:labels, y:labels, type:'heatmap', colorscale:'RdBu', reversescale:true,
+    text, texttemplate:'%{text}', textfont:{size:10, color:'#ffffff'},
+    hovertemplate:'r = %{text}<extra>%{y} × %{x}</extra>',
+    colorbar: {tickcolor: '#ffffff', tickfont:{color:'#ffffff'}}
+  }], baseLayout({margin:{l:120,r:10,t:30,b:80}}), {displayModeBar:true, responsive:true});
+});
+byId('clearMatrixSel')?.addEventListener('click', ()=>{
+  const mx = byId('mxMetrics'); if (mx) Array.from(mx.options).forEach(o=> o.selected=false);
+});
+
+function computeCorrelationMatrix(rows, fields){
+  const cols = fields;
+  const vectors = cols.map(c=> rows.map(r=> r[c]).filter(v=> isFinite(v)));
+  const n = cols.length; const matrix = Array.from({length:n},()=> Array(n).fill(0));
+  for (let i=0;i<n;i++){
+    for (let j=0;j<n;j++){
+      const a = vectors[i]; const b = vectors[j];
+      const m = Math.min(a.length,b.length);
+      if (m<2){ matrix[i][j] = NaN; continue; }
+      matrix[i][j] = pearson(a.slice(0,m), b.slice(0,m));
+    }
+  }
+  return {labels:cols, matrix};
+}
+
+// ==========================
+// AUTO‑INSIGHTS
+// ==========================
+byId('runInsights')?.addEventListener('click', ()=>{
+  console.log('[insights/run] start');
+  const dim = byId('inDim').value; const metric = byId('inMetric').value; const agg = byId('inAgg').value;
+  const fcol = byId('inFilterCol')?.value || '';
+  const fval = byId('inFilterVal')?.value || '';
+  const N = parseInt(byId('inTopN').value||'5',10);
+  if (!dim || !metric) return alert('Selecione dimensão e métrica.');
+  const rows = applyFilterSmart(state.rows, fcol, fval);
+  console.log('[insights/run] rows after filter:', rows.length, {fcol, fval});
+  const groups = groupBy(rows.filter(r=> isFinite(r[metric])), r=> String(r[dim]??''));
+  const stats = [];
+  for (const [g, arr] of groups){
+    const vals = arr.map(r=> r[metric]);
+    stats.push({g, n: arr.length, sum: aggregate(vals,'sum'), mean: aggregate(vals,'mean'), median: aggregate(vals,'median'), min: aggregate(vals,'min'), max: aggregate(vals,'max')});
+  }
+  stats.sort((a,b)=> b[agg]-a[agg]);
+  const top = stats.slice(0, N); const bottom = stats.slice(-N).reverse();
+  renderInsights(dim, metric, agg, top, bottom);
+});
+byId('clearInsightsFilter')?.addEventListener('click', ()=>{
+  const fc = byId('inFilterCol'); const fv = byId('inFilterVal');
+  if (fc) fc.value = '';
+  if (fv) fv.value = '';
+});
+
+function renderInsights(dim, metric, agg, top, bottom){
+  const fmt = state.meta[metric]?.fmt||'number';
+  function table(rows){
+    let html = '<div class="scroll"><table><thead><tr><th>'+escapeHtml(dim)+'</th><th>N</th><th>'+agg.toUpperCase()+'</th><th>SUM</th><th>MIN</th><th>MAX</th></tr></thead><tbody>';
+    for (const r of rows){
+      html += `<tr><td>${escapeHtml(r.g)}</td><td>${r.n}</td><td>${formatValue(r[agg],fmt)}</td><td>${formatValue(r.sum,fmt)}</td><td>${formatValue(r.min,fmt)}</td><td>${formatValue(r.max,fmt)}</td></tr>`;
+    }
+    html += '</tbody></table></div>'; return html;
+  }
+  byId('insightsArea').innerHTML = `
+    <h2>Top por <code>${escapeHtml(metric)}</code> (${agg})</h2>
+    ${table(top)}
+    <h2 style="margin-top:12px">Bottom</h2>
+    ${table(bottom)}
+  `;
+}
+
+// filtro inteligente (métrica ou dimensão)
+function applyFilterSmart(rows, col, val){
+  if (!col || val==null || String(val).trim()==='') return rows;
+  const meta = state.meta[col];
+  const raw = String(val).trim();
+  let op = '', rhs = raw; 
+  const ops = ['>=','<=','>','<','='];
+  for (const o of ops){ if (raw.startsWith(o)){ op=o; rhs=raw.slice(o.length).trim(); break; } }
+  if (meta && meta.role==='metric'){
+    // Suporte a faixa: "min-max" (ex.: 100-200, -200, 100-)   
+    if (!op && /-/.test(rhs)){
+      const [lhsStr, rhsStr] = rhs.split('-', 2).map(s=> s.trim());
+      const lo = lhsStr? parseNumberLocale(lhsStr, state.locale) : -Infinity;
+      const hi = rhsStr? parseNumberLocale(rhsStr, state.locale) : Infinity;
+      return rows.filter(r=>{ const x = Number(r[col]); return isFinite(x) && x>=lo && x<=hi; });
+    }
+    const num = parseNumberLocale(rhs, state.locale);
+    return rows.filter(r=>{
+      const x = Number(r[col]); if (!isFinite(x) || !isFinite(num)) return false;
+      if (op==='>=') return x>=num; if (op==='<=') return x<=num; if (op==='>') return x>num; if (op==='<') return x<num; if (op==='=') return x===num; return x>=num;
+    });
+  } else {
+    const needle = rhs.toLowerCase();
+    return rows.filter(r=> String(r[col]||'').toLowerCase().includes(needle));
+  }
+}
+
+// ==========================
+// TABELA ANINHADA
+// ==========================
+byId('runTree')?.addEventListener('click', ()=>{
+  const A = byId('treeDimA').value; const B = byId('treeDimB').value;
+  const fcol = byId('treeFilterCol').value; const fval = byId('treeFilterVal').value;
+  const orderBy = byId('treeOrderBy').value || 'Vendas';
+  const dir = byId('treeOrderDir').value || 'desc';
+  if (!A || !B) return alert('Selecione as duas dimensões.');
+  const rows = applyFilterSmart(state.rows, fcol, fval);
+  const data = buildTreeAgg(rows, A, B);
+  const sorter = (a,b)=> (dir==='asc'? ( (a[orderBy]||0)-(b[orderBy]||0) ) : ( (b[orderBy]||0)-(a[orderBy]||0) ));
+  data.sort(sorter); for(const n of data){ n.children.sort(sorter); }
+  renderTreeTable(data, A, B);
+  byId('exportTreeCsv').onclick = ()=> exportTreeCsv(data, A, B);
+});
+
+function sumBy(rows, col){ return rows.reduce((acc,r)=> acc + (Number(r[col])||0), 0); }
+function countDistinctBy(rows, col){ const s=new Set(); for(const r of rows){ s.add(String(r[col]??'')); } return s.size; }
+function buildTreeAgg(rows, A, B){
+  const S = state.std;
+  const groupsA = groupBy(rows, r=> String(r[A]??'')); 
+  // Total de produtos depende do tipo da coluna mapeada
+  const prodIsMetric = S.produtos && state.meta[S.produtos]?.role === 'metric';
+  const total = {
+    produtos: S.produtos? (prodIsMetric? sumBy(rows, S.produtos) : countDistinctBy(rows, S.produtos)) : rows.length,
+    investimento: S.investimento? sumBy(rows, S.investimento): 0,
+    vendas: S.vendas? sumBy(rows, S.vendas): 0
+  };
+  const result = [];
+  for (const [aKey, arrA] of groupsA){
+    const aggA = aggregateBlock(arrA, total);
+    result.push({ level:'A', key:aKey, ...aggA, children: [] });
+    const groupsB = groupBy(arrA, r=> String(r[B]??''));
+    for (const [bKey, arrB] of groupsB){
+      const aggB = aggregateBlock(arrB, total);
+      result[result.length-1].children.push({ level:'B', key:bKey, ...aggB });
+    }
+  }
+  return result;
+} 
+
+function aggregateBlock(rows, total){
+  const S = state.std;
+  // Produtos: se métrica, somar; se dimensão, contar distintos; senão, usar número de linhas
+  let prod;
+  if (S.produtos){
+    const isMetric = state.meta[S.produtos]?.role === 'metric';
+    prod = isMetric? sumBy(rows, S.produtos) : countDistinctBy(rows, S.produtos);
+  } else {
+    prod = rows.length;
+  }
+  const spend = S.investimento? sumBy(rows, S.investimento): 0;
+  const impr = S.imp? sumBy(rows, S.imp): 0;
+  const clk = S.cliques? sumBy(rows, S.cliques): 0;
+  const conv = S.conv? sumBy(rows, S.conv): 0;
+  const rev = S.vendas? sumBy(rows, S.vendas): 0;
+  const profit = state.cols.includes('Lucro')? sumBy(rows,'Lucro'): NaN;
+  const ticket = safeDiv(rev, conv);
+  const investPorProd = safeDiv(spend, prod);
+  const custoPorProdPct = safeDiv(investPorProd, ticket);
+  return {
+    'Produtos': prod,
+    '% prod.': total.produtos? (prod/total.produtos): NaN,
+    'Investimento': spend,
+    '% inv.': total.investimento? (spend/total.investimento): NaN,
+    'CPM': safeDiv(spend, impr)*1000,
+    'Impressões': impr,
+    'CTR': safeDiv(clk, impr),
+    'Cliques': clk,
+    'CPC': safeDiv(spend, clk),
+    'Taxa de conv': safeDiv(conv, clk),
+    'Vendas': rev,
+    '%': total.vendas? (rev/total.vendas): NaN,
+    'ROAS': safeDiv(rev, spend),
+    'Ticket médio': ticket,
+    'Lucro': profit,
+    'Média de invest. por prod.': investPorProd,
+    'Média de Custo / Produto': custoPorProdPct
+  };
+}
+
+function renderTreeTable(data, A, B){
+  const headers = ['Dimensão','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
+  const fmt = {
+    'Produtos':'number','% prod.':'percent','Investimento':'currency','% inv.':'percent','CPM':'currency','Impressões':'number','CTR':'percent','Cliques':'number','CPC':'currency','Taxa de conv':'percent','Vendas':'currency','%':'percent','ROAS':'number','Ticket médio':'currency','Lucro':'currency','Média de invest. por prod.':'currency','Média de Custo / Produto':'percent'
+  };
+  const numericHeaders = new Set(headers.slice(1));
+  let html = '<div class="scroll"><table class="table-zebra"><thead><tr>' + headers.map((h,i)=>`<th${i>0? ' class="num"':''}>${h}</th>`).join('') + '</tr></thead><tbody>';
+  for (const node of data){
+    const rowA = [ `<strong>${escapeHtml(A)}: ${escapeHtml(node.key)}</strong>`, ...headers.slice(1).map(h=> formatValue(node[h], fmt[h])) ];
+    html += '<tr class="row-a">' + rowA.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
+    for (const ch of node.children){
+      const rowB = [ `└─ ${escapeHtml(B)}: ${escapeHtml(ch.key)}`, ...headers.slice(1).map(h=> formatValue(ch[h], fmt[h])) ];
+      html += '<tr class="row-b">' + rowB.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
+    }
+  }
+  html += '</tbody></table></div>';
+  byId('treeArea').innerHTML = html;
+}
+
+function exportTreeCsv(data, A, B){
+  const headers = ['Nivel','Chave','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
+  let csv = headers.join(',')+'\n';
+  const toRow = (lvl, key, obj)=> [lvl,`"${key.replaceAll('"','""')}"`,obj['Produtos'],obj['% prod.'],obj['Investimento'],obj['% inv.'],obj['CPM'],obj['Impressões'],obj['CTR'],obj['Cliques'],obj['CPC'],obj['Taxa de conv'],obj['Vendas'],obj['%'],obj['ROAS'],obj['Ticket médio'],obj['Lucro'],obj['Média de invest. por prod.'],obj['Média de Custo / Produto']].join(',');
+  for (const node of data){
+    csv += toRow('A:'+A, node.key, node) + '\n';
+    for (const ch of node.children){ csv += toRow('B:'+B, ch.key, ch) + '\n'; }
+  }
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download = `tabela_aninhada_${A}_x_${B}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==========================
+// Tabs & helpers
+// ==========================
+for (const btn of document.querySelectorAll('.tabbar button')){
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tabbar button').forEach(b=> b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.getAttribute('data-tab');
+    ['heat','scatter','matrix','insights'].forEach(id=>{
+      byId('tab-'+id).classList.toggle('hidden', id!==tab); 
+    }) 
+  });
+} 
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
+</script >
+</body>
+</html>
