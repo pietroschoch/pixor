@@ -26,7 +26,7 @@
     h2{font-size:16px;margin:18px 0 10px;font-weight:600}
     a{color:var(--accent)}
     .app-shell{display:flex;min-height:100vh;background:var(--surface)}
-    #sidebar{display:flex;flex-direction:column;width:240px;min-width:240px;background:var(--panel);border-right:1px solid var(--border);padding:16px;gap:20px;transition:width .3s ease,padding .3s ease;position:relative}
+    #sidebar{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;width:240px;min-width:240px;background:var(--panel);border-right:1px solid var(--border);padding:16px;gap:16px;transition:width .3s ease,padding .3s ease;position:relative}
     #sidebar.collapsed{width:52px;min-width:52px;padding:16px 8px;background:var(--bg)}
     #sidebar.collapsed::after{content:"";position:absolute;top:0;right:0;width:1px;height:100%;background:var(--border)}
     .sidebar-toggle{display:flex;align-items:center;gap:8px;justify-content:flex-start;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:8px 10px;cursor:pointer;font-weight:600;transition:background .2s ease}
@@ -36,11 +36,11 @@
     #sidebar.collapsed .sidebar-toggle{justify-content:center}
     #sidebar.collapsed .sidebar-toggle .label{display:none}
     #sidebar.collapsed .sidebar-content{display:none}
-    .sidebar-content{display:flex;flex-direction:column;gap:20px}
-    .logo-block{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-    .logo-block svg{width:140px;max-width:100%}
+    .sidebar-content{display:flex;flex-direction:column;gap:16px;align-items:flex-start}
+    .logo-block{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+    .logo-block svg{width:110px;max-width:100%}
     .logo-title{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
-    .sidebar-nav{display:flex;flex-direction:column;gap:8px}
+    .sidebar-nav{display:flex;flex-direction:column;gap:8px;width:100%}
     .sidebar-nav button{display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
     .sidebar-nav button:hover{background:rgba(142,136,129,0.16)}
     .sidebar-nav button.active{background:var(--accent-strong);border-color:var(--accent-strong)}
@@ -57,7 +57,8 @@
     .muted{color:var(--muted)}
     select, input[type=number], input[type=text], button{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:8px 12px;font-family:"Geist","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
     button{cursor:pointer;transition:background .2s ease,border-color .2s ease}
-    button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+    button.primary{background:#F5F5F5;color:#0D0D0D;border-color:#F5F5F5}
+    button.primary:hover{background:#ffffff;border-color:#ffffff}
     .btns button:not(.primary){background:transparent;color:var(--text);border:1px solid var(--border)}
     .btns button:not(.primary):hover{background:rgba(142,136,129,0.16)}
     .grid{display:grid; gap:10px}
@@ -89,10 +90,6 @@
     .tabbar button.active{background:var(--accent-strong); border-color:var(--accent-strong)}
     .hidden{display:none !important}
     .main-section{margin-top:24px;display:flex;flex-direction:column;gap:20px}
-    .viewtabs{display:flex; gap:8px; margin:8px 0}
-    .viewtabs button{padding:8px 12px; border-radius:12px; border:1px solid var(--border); background:transparent}
-    .viewtabs button.active{background:var(--accent-strong); border-color:var(--accent-strong)}
-    .view-content .panel{padding:12px}
   </style>
 </head>
 <body>
@@ -116,167 +113,129 @@
           <span class="logo-title">Logo</span>
         </div>
         <nav class="sidebar-nav" aria-label="Seções">
-          <button class="active" type="button" data-target="view" aria-controls="section-view" aria-pressed="true">Visualização</button>
           <button type="button" data-target="config" aria-controls="section-config" aria-pressed="false">Configuração</button>
+          <button class="active" type="button" data-target="graphs" aria-controls="section-graphs" aria-pressed="true">Área de gráficos</button>
+          <button type="button" data-target="table" aria-controls="section-table" aria-pressed="false">Tabela aninhada</button>
         </nav>
       </div>
     </aside>
     <main id="mainContent">
       <div class="main-wrap">
         <h1>Octo Correlator <span class="muted">— análise visual & correlações</span></h1>
-        <section id="section-view" class="main-section" aria-hidden="false">
-          <div class="viewtabs" role="tablist" aria-label="Visualização">
-            <button class="active" data-view="graphs">Gráficos</button>
-            <button data-view="table">Tabela aninhada</button>
+        <section id="section-graphs" class="main-section" aria-hidden="false">
+          <div>
+            <h2>Área de gráficos</h2>
+            <p class="muted">Heatmap, dispersão, matriz de correlação e auto‑insights.</p>
           </div>
-
-          <div class="view-content">
-            <div id="view-graphs">
-              <details style="margin-top:12px" open>
-                <summary><strong>Visualizações</strong> — Heatmap, Dispersão, Matriz e Insights</summary>
-                <div class="panel" style="margin-top:8px">
-                  <div class="tabbar">
-                    <button class="active" data-tab="heat">Pivot Heatmap</button>
-                    <button data-tab="scatter">Dispersão</button>
-                    <button data-tab="matrix">Matriz</button>
-                    <button data-tab="insights">Auto‑insights</button>
-                  </div>
-
-                  <div id="tab-heat">
-          <div class="grid cols-6">
-            <label>Dimensão A
-              <select id="heatDimA"></select>
-            </label>
-            <label>Dimensão B
-              <select id="heatDimB"></select>
-            </label>
-            <label>Métrica
-              <select id="heatMetric"></select>
-            </label>
-            <label>Agregador
-              <select id="heatAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option><option value="count">count</option><option value="countDistinct">countDistinct</option></select>
-            </label>
-            <label>Filtro (coluna)
-              <select id="heatFilterCol"></select>
-            </label>
-            <label>Filtro (valor/padrão)
-              <input id="heatFilterVal" type="text" placeholder="Ex.: Cluster=Core, Impressões>=50000, CTR>=2%" />
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runHeat" class="primary">Gerar heatmap</button>
-            <button id="clearHeatFilter">Limpar filtro</button>
-            <button id="exportHeatCsv">Exportar CSV</button>
-          </div>
-          <div id="heatInfo" class="note" style="margin-top:8px"></div>
-          <div id="heatChart" style="margin-top:10px"></div>
-        </div>
-
-        <div id="tab-scatter" class="hidden">
-          <div class="grid cols-6">
-            <label>X (métrica)
-              <select id="scX"></select>
-            </label>
-            <label>Y (métrica)
-              <select id="scY"></select>
-            </label>
-            <label>Cor (dimensão)
-              <select id="scColor"></select>
-            </label>
-            <label>Tamanho (métrica)
-              <select id="scSize"></select>
-            </label>
-            <label>Filtro (coluna)
-              <select id="scFilterCol"></select>
-            </label>
-            <label>Filtro (valor/padrão)
-              <input id="scFilterVal" type="text" placeholder="Ex.: Categoria=Shoes, Cliques>=1000" />
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runScatter" class="primary">Gerar dispersão</button>
-            <button id="clearScatterFilter">Limpar filtro</button>
-          </div>
-          <div id="scInfo" class="note" style="margin-top:8px"></div>
-          <div id="scatterChart" style="margin-top:10px"></div>
-        </div>
-
-        <div id="tab-matrix" class="hidden">
-          <div class="grid cols-6">
-            <label>Métricas (CTRL/CMD para múltiplas)
-              <select id="mxMetrics" multiple size="8"></select>
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runMatrix" class="primary">Gerar matriz</button>
-            <button id="clearMatrixSel">Limpar seleção</button>
-          </div>
-          <div id="matrixChart" style="margin-top:10px"></div>
-        </div>
-
-        <div id="tab-insights" class="hidden">
-          <div class="grid cols-6">
-            <label>Dimensão
-              <select id="inDim"></select>
-            </label>
-            <label>Métrica
-              <select id="inMetric"></select>
-            </label>
-            <label>Agregador
-              <select id="inAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option></select>
-            </label>
-            <label>Top N
-              <input id="inTopN" type="number" value="5" min="1" />
-            </label>
-            <label>Filtro (coluna)
-              <select id="inFilterCol"></select>
-            </label>
-            <label>Filtro (valor/padrão)
-              <input id="inFilterVal" type="text" placeholder="Ex.: ROAS>=2, Cluster=Core" />
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runInsights" class="primary">Rodar insights</button>
-            <button id="clearInsightsFilter">Limpar filtro</button>
-          </div>
-          <div id="insightsArea" style="margin-top:10px"></div>
+          <div class="panel">
+            <div class="tabbar">
+              <button class="active" data-tab="heat">Pivot Heatmap</button>
+              <button data-tab="scatter">Dispersão</button>
+              <button data-tab="matrix">Matriz</button>
+              <button data-tab="insights">Auto‑insights</button>
             </div>
-          </details>
-        </div>
 
-        <div id="view-table" class="hidden">
-          <details style="margin-top:12px" open>
-            <summary><strong>Tabela aninhada</strong> — selecione 2 dimensões (ex.: Cluster → Categoria) e visualize todas as métricas agregadas</summary>
-            <div class="panel" style="margin-top:8px">
+            <div id="tab-heat">
               <div class="grid cols-6">
-                <label>Dimensão Pai (nível 1)
-                  <select id="treeDimA"></select>
+                <label>Dimensão A
+                  <select id="heatDimA"></select>
                 </label>
-                <label>Dimensão Filha (nível 2)
-                  <select id="treeDimB"></select>
+                <label>Dimensão B
+                  <select id="heatDimB"></select>
+                </label>
+                <label>Métrica
+                  <select id="heatMetric"></select>
+                </label>
+                <label>Agregador
+                  <select id="heatAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option><option value="count">count</option><option value="countDistinct">countDistinct</option></select>
                 </label>
                 <label>Filtro (coluna)
-                  <select id="treeFilterCol"></select>
+                  <select id="heatFilterCol"></select>
                 </label>
                 <label>Filtro (valor/padrão)
-                  <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
-                </label>
-                <label>Ordenar por
-                  <select id="treeOrderBy"></select>
-                </label>
-                <label>Ordem
-                  <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
+                  <input id="heatFilterVal" type="text" placeholder="Ex.: Cluster=Core, Impressões>=50000, CTR>=2%" />
                 </label>
               </div>
               <div class="btns" style="margin-top:10px">
-                <button id="runTree" class="primary">Gerar tabela</button>
-                <button id="exportTreeCsv">Exportar CSV</button>
+                <button id="runHeat" class="primary">Gerar heatmap</button>
+                <button id="clearHeatFilter">Limpar filtro</button>
+                <button id="exportHeatCsv">Exportar CSV</button>
               </div>
-              <div id="treeArea" style="margin-top:10px"></div>
+              <div id="heatInfo" class="note" style="margin-top:8px"></div>
+              <div id="heatChart" style="margin-top:10px"></div>
             </div>
-          </details>
-        </div>
-      </div>
+
+            <div id="tab-scatter" class="hidden">
+              <div class="grid cols-6">
+                <label>X (métrica)
+                  <select id="scX"></select>
+                </label>
+                <label>Y (métrica)
+                  <select id="scY"></select>
+                </label>
+                <label>Cor (dimensão)
+                  <select id="scColor"></select>
+                </label>
+                <label>Tamanho (métrica)
+                  <select id="scSize"></select>
+                </label>
+                <label>Filtro (coluna)
+                  <select id="scFilterCol"></select>
+                </label>
+                <label>Filtro (valor/padrão)
+                  <input id="scFilterVal" type="text" placeholder="Ex.: Categoria=Shoes, Cliques>=1000" />
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runScatter" class="primary">Gerar dispersão</button>
+                <button id="clearScatterFilter">Limpar filtro</button>
+              </div>
+              <div id="scInfo" class="note" style="margin-top:8px"></div>
+              <div id="scatterChart" style="margin-top:10px"></div>
+            </div>
+
+            <div id="tab-matrix" class="hidden">
+              <div class="grid cols-6">
+                <label>Métricas (CTRL/CMD para múltiplas)
+                  <select id="mxMetrics" multiple size="8"></select>
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runMatrix" class="primary">Gerar matriz</button>
+                <button id="clearMatrixSel">Limpar seleção</button>
+              </div>
+              <div id="matrixChart" style="margin-top:10px"></div>
+            </div>
+
+            <div id="tab-insights" class="hidden">
+              <div class="grid cols-6">
+                <label>Dimensão
+                  <select id="inDim"></select>
+                </label>
+                <label>Métrica
+                  <select id="inMetric"></select>
+                </label>
+                <label>Agregador
+                  <select id="inAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option></select>
+                </label>
+                <label>Top N
+                  <input id="inTopN" type="number" value="5" min="1" />
+                </label>
+                <label>Filtro (coluna)
+                  <select id="inFilterCol"></select>
+                </label>
+                <label>Filtro (valor/padrão)
+                  <input id="inFilterVal" type="text" placeholder="Ex.: ROAS>=2, Cluster=Core" />
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runInsights" class="primary">Rodar insights</button>
+                <button id="clearInsightsFilter">Limpar filtro</button>
+              </div>
+              <div id="insightsArea" style="margin-top:10px"></div>
+            </div>
+          </div>
+
           <details style="margin-top:12px">
             <summary><strong>Ajuda rápida</strong></summary>
             <div class="panel" style="margin-top:8px">
@@ -291,6 +250,40 @@
               <div class="note">Tudo roda 100% no navegador. O mapeamento pode ser salvo no seu <em>localStorage</em>.</div>
             </div>
           </details>
+        </section>
+
+        <section id="section-table" class="main-section hidden" aria-hidden="true">
+          <div>
+            <h2>Tabela aninhada</h2>
+            <p class="muted">Selecione 2 dimensões (ex.: Cluster → Categoria) e visualize as métricas agregadas.</p>
+          </div>
+          <div class="panel">
+            <div class="grid cols-6">
+              <label>Dimensão Pai (nível 1)
+                <select id="treeDimA"></select>
+              </label>
+              <label>Dimensão Filha (nível 2)
+                <select id="treeDimB"></select>
+              </label>
+              <label>Filtro (coluna)
+                <select id="treeFilterCol"></select>
+              </label>
+              <label>Filtro (valor/padrão)
+                <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
+              </label>
+              <label>Ordenar por
+                <select id="treeOrderBy"></select>
+              </label>
+              <label>Ordem
+                <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
+              </label>
+            </div>
+            <div class="btns" style="margin-top:10px">
+              <button id="runTree" class="primary">Gerar tabela</button>
+              <button id="exportTreeCsv">Exportar CSV</button>
+            </div>
+            <div id="treeArea" style="margin-top:10px"></div>
+          </div>
         </section>
 
         <section id="section-config" class="main-section hidden" aria-hidden="true">
@@ -374,6 +367,9 @@
                 <div id="stdMapStatus" class="note" style="margin-top:6px"></div>
               </div>
             </details>
+          </div>
+          <div class="btns" style="margin-top:16px">
+            <button id="finishConfig" class="primary" type="button">Finalizar</button>
           </div>
         </section>
 
@@ -1306,22 +1302,27 @@ if (sidebar && sidebarToggle){
   applyLabels();
 }
 
-const navButtons = document.querySelectorAll('.sidebar-nav button');
-if (navButtons.length){
-  const setSection = (target)=>{
-    navButtons.forEach(btn=>{
-      const isActive = btn.dataset.target === target;
-      btn.classList.toggle('active', isActive);
-      btn.setAttribute('aria-pressed', String(isActive));
-    });
-    document.querySelectorAll('.main-section').forEach(section=>{
-      const show = section.id === `section-${target}`;
-      section.classList.toggle('hidden', !show);
-      section.setAttribute('aria-hidden', String(!show));
-    });
-    triggerPlotlyResize();
-  };
+const navButtons = Array.from(document.querySelectorAll('.sidebar-nav button'));
+function setSection(target){
+  if (!navButtons.length) return;
+  navButtons.forEach(btn=>{
+    const isActive = btn.dataset.target === target;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', String(isActive));
+  });
+  document.querySelectorAll('.main-section').forEach(section=>{
+    const show = section.id === `section-${target}`;
+    section.classList.toggle('hidden', !show);
+    section.setAttribute('aria-hidden', String(!show));
+  });
+  triggerPlotlyResize();
+  if (target === 'graphs'){
+    window.requestAnimationFrame(triggerPlotlyResize);
+    setTimeout(triggerPlotlyResize, 320);
+  }
+}
 
+if (navButtons.length){
   navButtons.forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const target = btn.dataset.target;
@@ -1329,25 +1330,14 @@ if (navButtons.length){
       setSection(target);
     });
   });
-
   const initial = document.querySelector('.sidebar-nav button.active')?.dataset.target || navButtons[0].dataset.target;
   if (initial){
     setSection(initial);
   }
 }
 
-// Abas de visualização (Gráficos / Tabela)
-document.querySelectorAll('.viewtabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.viewtabs button').forEach(b=> b.classList.remove('active'));
-    btn.classList.add('active');
-    const view = btn.getAttribute('data-view');
-    byId('view-graphs').classList.toggle('hidden', view !== 'graphs');
-    byId('view-table').classList.toggle('hidden', view !== 'table');
-    if (view === 'graphs'){
-      window.requestAnimationFrame(triggerPlotlyResize);
-    }
-  });
+byId('finishConfig')?.addEventListener('click', ()=>{
+  setSection('graphs');
 });
 </script>
 </body>
