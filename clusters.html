@@ -15,7 +15,7 @@
     }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);font:500 14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,"Helvetica Neue",Arial}
-    h1{font-size:20px;margin:0 0 8px}
+    h1{font-size:20px;margin:0 0 8px} 
     h2{font-size:16px;margin:14px 0 8px}
     a{color:var(--accent2)}
     .wrap{max-width:1940px;margin:24px auto;padding:0 16px}
@@ -64,6 +64,16 @@
     .tabbar button{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:#0b0d12}
     .tabbar button.active{background:linear-gradient(135deg,#111827,#0b0d12); border-color:#334155}
     .hidden{display:none}
+    /* Etapas (Configuração / Visualização) */
+    .sectionbar{display:flex; gap:8px; margin:16px 0}
+    .sectionbar button{padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#0b0d12; color:var(--text); font-weight:600}
+    .sectionbar button.active{background:linear-gradient(135deg,#1f2937,#0b0d12); border-color:#334155}
+    /* Abas de Visualização (Gráficos / Tabela) */
+    .viewtabs{display:flex; gap:8px; margin:8px 0}
+    .viewtabs button{padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:#0b0d12}
+    .viewtabs button.active{background:linear-gradient(135deg,#111827,#0b0d12); border-color:#334155}
+    /* Conteúdo amplo para visualização */
+    .view-content .panel{padding:12px}
   </style>
 </head>
 <body>
@@ -88,69 +98,84 @@
       <div id="loadedInfo" class="muted"></div>
     </div>
 
-    <details style="margin-top:12px" open>
-      <summary><strong>1) Mapeamento de colunas</strong> — defina Dimensões (texto) e Métricas (números)</summary>
-      <div id="mapArea" class="panel" style="margin-top:8px">
-        <div class="note">Detectamos tipos automaticamente (pt‑BR). Você pode ajustar o papel (Dimensão/Métrica/ignorar) e o formato de exibição para métricas.</div>
-        <div id="mapTable" class="scroll" style="margin-top:10px"></div>
-        <div class="btns" style="margin-top:10px">
-          <button id="saveMap" class="primary">Aplicar mapeamento</button>
-          <button id="storeMap">Salvar preferências (local)</button>
-          <button id="downloadMap">Baixar mapeamento</button>
-          <label class="pill">Carregar
-            <input id="uploadMap" type="file" accept="application/json" />
-          </label>
-          <span id="mapStatus" class="muted"></span>
+    <div class="sectionbar" role="tablist" aria-label="Etapas">
+      <button class="active" data-section="config">Configuração</button>
+      <button data-section="view">Visualização</button>
+    </div>
+
+    <div id="section-config">
+      <details style="margin-top:12px" open>
+        <summary><strong>1) Mapeamento de colunas</strong> — defina Dimensões (texto) e Métricas (números)</summary>
+        <div id="mapArea" class="panel" style="margin-top:8px">
+          <div class="note">Detectamos tipos automaticamente (pt‑BR). Você pode ajustar o papel (Dimensão/Métrica/ignorar) e o formato de exibição para métricas.</div>
+          <div id="mapTable" class="scroll" style="margin-top:10px"></div>
+          <div class="btns" style="margin-top:10px">
+            <button id="saveMap" class="primary">Aplicar mapeamento</button>
+            <button id="storeMap">Salvar preferências (local)</button>
+            <button id="downloadMap">Baixar mapeamento</button>
+            <label class="pill">Carregar
+              <input id="uploadMap" type="file" accept="application/json" />
+            </label>
+            <span id="mapStatus" class="muted"></span>
+          </div>
         </div>
+      </details>
+
+      <details style="margin-top:12px" open>
+        <summary><strong>2) Construtor de Métricas</strong> — aponte colunas‑base (Investimento, Impressões, etc.) e geramos métricas derivadas (CPM, CTR, CPC, ROAS…)</summary>
+        <div class="panel" style="margin-top:8px">
+          <div class="grid cols-6">
+            <label>Produtos
+              <select id="mapProd"></select>
+            </label>
+            <label>Investimento
+              <select id="mapSpend"></select>
+            </label>
+            <label>Impressões
+              <select id="mapImpr"></select>
+            </label>
+            <label>Cliques
+              <select id="mapClicks"></select>
+            </label>
+            <label>Conversões
+              <select id="mapConv"></select>
+            </label>
+            <label>Vendas (valor)
+              <select id="mapRev"></select>
+            </label>
+            <label>Lucro (opcional)
+              <select id="mapProfit"></select>
+            </label>
+            <label class="pill"><input id="optProfitFallback" type="checkbox" checked> Se não houver lucro, usar <em>Vendas − Investimento</em></label>
+          </div>
+          <div class="btns" style="margin-top:10px">
+            <button id="applyStdMap" class="primary">Gerar/atualizar métricas derivadas</button>
+            <span class="note">Campos derivados: <code>CPM</code>, <code>CTR</code>, <code>CPC</code>, <code>Taxa de conv</code>, <code>ROAS</code>, <code>Ticket médio</code>, <code>Média de invest. por prod.</code>, <code>Média de Custo / Produto</code>.</span>
+          </div>
+          <div id="stdMapStatus" class="note" style="margin-top:6px"></div>
+        </div>
+      </details>
+    </div>
+
+    <div id="section-view" class="hidden">
+      <div class="viewtabs" role="tablist" aria-label="Visualização">
+        <button class="active" data-view="graphs">Gráficos</button>
+        <button data-view="table">Tabela aninhada</button>
       </div>
-    </details>
 
-    <details style="margin-top:12px" open>
-      <summary><strong>2) Construtor de Métricas</strong> — aponte colunas‑base (Investimento, Impressões, etc.) e geramos métricas derivadas (CPM, CTR, CPC, ROAS…)</summary>
-      <div class="panel" style="margin-top:8px">
-        <div class="grid cols-6">
-          <label>Produtos
-            <select id="mapProd"></select>
-          </label>
-          <label>Investimento
-            <select id="mapSpend"></select>
-          </label>
-          <label>Impressões
-            <select id="mapImpr"></select>
-          </label>
-          <label>Cliques
-            <select id="mapClicks"></select>
-          </label>
-          <label>Conversões
-            <select id="mapConv"></select>
-          </label>
-          <label>Vendas (valor)
-            <select id="mapRev"></select>
-          </label>
-          <label>Lucro (opcional)
-            <select id="mapProfit"></select>
-          </label>
-          <label class="pill"><input id="optProfitFallback" type="checkbox" checked> Se não houver lucro, usar <em>Vendas − Investimento</em></label>
-        </div>
-        <div class="btns" style="margin-top:10px">
-          <button id="applyStdMap" class="primary">Gerar/atualizar métricas derivadas</button>
-          <span class="note">Campos derivados: <code>CPM</code>, <code>CTR</code>, <code>CPC</code>, <code>Taxa de conv</code>, <code>ROAS</code>, <code>Ticket médio</code>, <code>Média de invest. por prod.</code>, <code>Média de Custo / Produto</code>.</span>
-        </div>
-        <div id="stdMapStatus" class="note" style="margin-top:6px"></div>
-      </div>
-    </details>
+      <div class="view-content">
+        <div id="view-graphs">
+          <details style="margin-top:12px" open>
+            <summary><strong>Visualizações</strong> — Heatmap, Dispersão, Matriz e Insights</summary>
+            <div class="panel" style="margin-top:8px">
+              <div class="tabbar">
+                <button class="active" data-tab="heat">Pivot Heatmap</button>
+                <button data-tab="scatter">Dispersão</button>
+                <button data-tab="matrix">Matriz</button>
+                <button data-tab="insights">Auto‑insights</button>
+              </div>
 
-    <details style="margin-top:12px" open>
-      <summary><strong>3) Visualizações</strong> — Heatmap, Dispersão, Matriz e Insights</summary>
-      <div class="panel" style="margin-top:8px">
-        <div class="tabbar">
-          <button class="active" data-tab="heat">Pivot Heatmap</button>
-          <button data-tab="scatter">Dispersão</button>
-          <button data-tab="matrix">Matriz</button>
-          <button data-tab="insights">Auto‑insights</button>
-        </div>
-
-        <div id="tab-heat">
+              <div id="tab-heat">
           <div class="grid cols-6">
             <label>Dimensão A
               <select id="heatDimA"></select>
@@ -248,40 +273,46 @@
             <button id="clearInsightsFilter">Limpar filtro</button>
           </div>
           <div id="insightsArea" style="margin-top:10px"></div>
+            </div>
+          </details>
         </div>
-      </div>
-    </details>
 
-    <details style="margin-top:12px" open>
-      <summary><strong>4) Tabela aninhada</strong> — selecione 2 dimensões (ex.: Cluster → Categoria) e visualize todas as métricas agregadas</summary>
-      <div class="panel" style="margin-top:8px">
-        <div class="grid cols-6">
-          <label>Dimensão Pai (nível 1)
-            <select id="treeDimA"></select>
-          </label>
-          <label>Dimensão Filha (nível 2)
-            <select id="treeDimB"></select>
-          </label>
-          <label>Filtro (coluna)
-            <select id="treeFilterCol"></select>
-          </label>
-          <label>Filtro (valor/padrão)
-            <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
-          </label>
-          <label>Ordenar por
-            <select id="treeOrderBy"></select>
-          </label>
-          <label>Ordem
-            <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
-          </label>
+        <div id="view-table" class="hidden">
+          <details style="margin-top:12px" open>
+            <summary><strong>Tabela aninhada</strong> — selecione 2 dimensões (ex.: Cluster → Categoria) e visualize todas as métricas agregadas</summary>
+            <div class="panel" style="margin-top:8px">
+              <div class="grid cols-6">
+                <label>Dimensão Pai (nível 1)
+                  <select id="treeDimA"></select>
+                </label>
+                <label>Dimensão Filha (nível 2)
+                  <select id="treeDimB"></select>
+                </label>
+                <label>Filtro (coluna)
+                  <select id="treeFilterCol"></select>
+                </label>
+                <label>Filtro (valor/padrão)
+                  <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
+                </label>
+                <label>Ordenar por
+                  <select id="treeOrderBy"></select>
+                </label>
+                <label>Ordem
+                  <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runTree" class="primary">Gerar tabela</button>
+                <button id="exportTreeCsv">Exportar CSV</button>
+              </div>
+              <div id="treeArea" style="margin-top:10px"></div>
+            </div>
+          </details>
         </div>
-        <div class="btns" style="margin-top:10px">
-          <button id="runTree" class="primary">Gerar tabela</button>
-          <button id="exportTreeCsv">Exportar CSV</button>
-        </div>
-        <div id="treeArea" style="margin-top:10px"></div>
       </div>
-    </details>
+    </div>
+
+    
 
     <details style="margin-top:12px">
       <summary><strong>Ajuda rápida</strong></summary>
@@ -1186,6 +1217,32 @@ for (const btn of document.querySelectorAll('.tabbar button')){
 } 
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
+
+// ==========================
+// Navegação: Etapas e Visualização
+// ==========================
+// Etapas (Configuração / Visualização)
+document.querySelectorAll('.sectionbar button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.sectionbar button').forEach(b=> b.classList.remove('active'));
+    btn.classList.add('active');
+    const sec = btn.getAttribute('data-section');
+    const isConfig = sec === 'config';
+    byId('section-config').classList.toggle('hidden', !isConfig);
+    byId('section-view').classList.toggle('hidden', isConfig);
+  });
+});
+
+// Abas de visualização (Gráficos / Tabela)
+document.querySelectorAll('.viewtabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.viewtabs button').forEach(b=> b.classList.remove('active'));
+    btn.classList.add('active');
+    const view = btn.getAttribute('data-view');
+    byId('view-graphs').classList.toggle('hidden', view !== 'graphs');
+    byId('view-table').classList.toggle('hidden', view !== 'table');
+  });
+});
 </script >
 </body>
 </html>
