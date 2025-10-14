@@ -9,327 +9,373 @@
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
     :root{
-      --bg:#0f1115; --panel:#171923; --muted:#9aa0aa; --text:#e8ecf1; --accent:#6ee7b7; --accent2:#60a5fa;
-      --red:#ef4444; --amber:#f59e0b; --green:#10b981; --border:#262a36;
+      --bg:#000000;
+      --panel:#252525;
+      --muted:#97938A;
+      --text:#F5F5F5;
+      --accent:#8E8881;
+      --accent-strong:#58554F;
+      --border:#58554F;
+      --surface:#111111;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:500 14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,"Helvetica Neue",Arial}
-    h1{font-size:20px;margin:0 0 8px} 
-    h2{font-size:16px;margin:14px 0 8px}
-    a{color:var(--accent2)}
-    .wrap{max-width:1940px;margin:24px auto;padding:0 16px}
-    .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--panel);padding:12px;border:1px solid var(--border);border-radius:14px}
-    .bar input[type=file]{padding:6px;background:#0b0d12;border:1px dashed var(--border);border-radius:10px}
-    .row{display:flex;gap:16px;margin-top:16px}
-    .col{flex:1}
-    .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
+    body{margin:0;background:var(--bg);color:var(--text);font:500 14px/1.5 "Geist","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
+    h1{font-size:20px;margin:0 0 8px;font-weight:600}
+    h2{font-size:16px;margin:18px 0 10px;font-weight:600}
+    a{color:var(--accent)}
+    .app-shell{display:flex;min-height:100vh;background:var(--surface)}
+    #sidebar{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;width:240px;min-width:240px;background:var(--panel);border-right:1px solid var(--border);padding:16px;gap:16px;transition:width .3s ease,padding .3s ease;position:relative}
+    #sidebar.collapsed{width:52px;min-width:52px;padding:16px 8px;background:var(--bg)}
+    #sidebar.collapsed::after{content:"";position:absolute;top:0;right:0;width:1px;height:100%;background:var(--border)}
+    .sidebar-toggle{display:flex;align-items:center;gap:8px;justify-content:flex-start;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:8px 10px;cursor:pointer;font-weight:600;transition:background .2s ease}
+    .sidebar-toggle:hover{background:var(--accent-strong)}
+    .sidebar-toggle .icon{font-size:16px}
+    .sidebar-toggle .label{white-space:nowrap}
+    #sidebar.collapsed .sidebar-toggle{justify-content:center}
+    #sidebar.collapsed .sidebar-toggle .label{display:none}
+    #sidebar.collapsed .sidebar-content{display:none}
+    .sidebar-content{display:flex;flex-direction:column;gap:16px;align-items:flex-start}
+    .logo-block{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+    .logo-block svg{width:110px;max-width:100%}
+    .logo-title{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+    .sidebar-nav{display:flex;flex-direction:column;gap:8px;width:100%}
+    .sidebar-nav button{display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+    .sidebar-nav button:hover{background:rgba(142,136,129,0.16)}
+    .sidebar-nav button.active{background:var(--accent-strong);border-color:var(--accent-strong)}
+    #mainContent{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+    .main-wrap{max-width:1940px;width:100%;margin:24px auto;padding:0 24px 32px}
+    #heatChart,#scatterChart,#matrixChart,#treeArea{width:100%}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px}
+    .section-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:grid;gap:12px}
+    .section-card label:not(.pill){display:flex;flex-direction:column;gap:6px;font-weight:600}
+    .section-card input[type=file]{padding:8px;background:var(--surface);border:1px dashed var(--border);border-radius:12px;color:var(--text)}
+    .section-card button{width:100%}
+    .dataset-options{display:grid;gap:10px}
+    @media(min-width:720px){.dataset-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .muted{color:var(--muted)}
-    select, input[type=number], input[type=text], button{background:#0b0d12;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
-    button{cursor:pointer}
-    /* Botões: primários brancos, secundários escuros */
-    button.primary{background:#ffffff; color:#0b0d12; border:1px solid #e5e7eb; font-weight:700}
-    .btns button:not(.primary){background:#0b0d12; color:var(--text); border:1px solid var(--border)}
-    .grid{display:grid; gap:8px}
+    select, input[type=number], input[type=text], button{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:8px 12px;font-family:"Geist","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
+    button{cursor:pointer;transition:background .2s ease,border-color .2s ease}
+    button.primary{background:#F5F5F5;color:#0D0D0D;border-color:#F5F5F5}
+    button.primary:hover{background:#ffffff;border-color:#ffffff}
+    .btns button:not(.primary){background:transparent;color:var(--text);border:1px solid var(--border)}
+    .btns button:not(.primary):hover{background:rgba(142,136,129,0.16)}
+    .grid{display:grid; gap:10px}
     .grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
     .grid.cols-6{grid-template-columns:repeat(6,minmax(0,1fr))}
-    .scroll{overflow:auto; max-height:360px; border:1px solid var(--border); border-radius:12px}
-    /* Tabela aninhada mais alta */
+    .scroll{overflow:auto; max-height:360px; border:1px solid var(--border); border-radius:14px; width:100%; background:var(--surface)}
     #treeArea .scroll{max-height:720px}
     table{width:100%; border-collapse:collapse; min-width:720px}
     th,td{padding:8px 10px; border-bottom:1px solid var(--border)}
-    th{text-align:left; color:#cbd5e1; position:sticky; top:0; background:var(--panel)}
-    /* Tabela (UX): zebra, hover e alinhamento numérico */
-    .table-zebra tbody tr:nth-child(odd){ background:#0e111a }
-    .table-zebra tbody tr:nth-child(even){ background:#0b0d12 }
-    .table-zebra tbody tr:hover{ background:#151a28 }
+    th{text-align:left; color:var(--text); position:sticky; top:0; background:var(--panel)}
+    .table-zebra tbody tr:nth-child(odd){ background:#1b1b1b }
+    .table-zebra tbody tr:nth-child(even){ background:#151515 }
+    .table-zebra tbody tr:hover{ background:#1f1f1f }
     td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums }
     td.dim{ white-space:nowrap }
     .row-a td:first-child{ font-weight:700 }
     .row-b td:first-child{ padding-left:16px }
-    .tag{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
-    .tag.dim{background:#121520}
-    .tag.met{background:#101b14}
-    details{background:#0b0d12;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .tag{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;background:var(--surface)}
+    .tag.dim{background:rgba(142,136,129,0.16)}
+    .tag.met{background:rgba(88,85,79,0.26)}
+    details{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
     .pill{display:inline-block;border:1px solid var(--border);padding:6px 10px;border-radius:999px}
     .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .note{font-size:12px;color:#a6adbb}
-    .hl{color:var(--accent)}
-    .warn{color:var(--amber)}
-    .danger{color:var(--red)}
-    .success{color:var(--green)}
+    .note{font-size:12px;color:var(--muted)}
     .footer{margin:18px 0 8px; font-size:12px; color:var(--muted)}
-    .btns{display:flex; gap:8px; flex-wrap:wrap} 
+    .btns{display:flex; gap:8px; flex-wrap:wrap}
     .tabbar{display:flex; gap:6px; margin:8px 0}
-    .tabbar button{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:#0b0d12}
-    .tabbar button.active{background:linear-gradient(135deg,#111827,#0b0d12); border-color:#334155}
-    .hidden{display:none}
-    /* Etapas (Configuração / Visualização) */
-    .sectionbar{display:flex; gap:8px; margin:16px 0}
-    .sectionbar button{padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#0b0d12; color:var(--text); font-weight:600}
-    .sectionbar button.active{background:linear-gradient(135deg,#1f2937,#0b0d12); border-color:#334155}
-    /* Abas de Visualização (Gráficos / Tabela) */
-    .viewtabs{display:flex; gap:8px; margin:8px 0}
-    .viewtabs button{padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:#0b0d12}
-    .viewtabs button.active{background:linear-gradient(135deg,#111827,#0b0d12); border-color:#334155}
-    /* Conteúdo amplo para visualização */
-    .view-content .panel{padding:12px}
+    .tabbar button{padding:8px 12px;border-radius:12px;border:1px solid var(--border);background:transparent}
+    .tabbar button.active{background:var(--accent-strong); border-color:var(--accent-strong)}
+    .hidden{display:none !important}
+    .main-section{margin-top:24px;display:flex;flex-direction:column;gap:20px}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Octo Correlator <span class="muted">— análise visual & correlações</span></h1>
-    <div class="bar">
-      <input id="file" type="file" accept=".csv,.xlsx,.xls" />
-      <label class="pill">Separador CSV:
-        <select id="csvDelim">
-          <option value="," selected>Vírgula ,</option>
-          <option value=";">Ponto-e-vírgula ;</option>
-          <option value="\t">Tab</option>
-        </select>
-      </label>
-      <label class="pill">Formato numérico:
-        <select id="locale">
-          <option value="pt-BR" selected>pt‑BR (1.234,56 / R$ / %)</option>
-          <option value="en-US">en‑US (1,234.56 / $ / %)</option>
-        </select>
-      </label>
-      <button id="btnClear">Limpar dataset</button>
-      <div id="loadedInfo" class="muted"></div>
-    </div>
-
-    <div class="sectionbar" role="tablist" aria-label="Etapas">
-      <button class="active" data-section="config">Configuração</button>
-      <button data-section="view">Visualização</button>
-    </div>
-
-    <div id="section-config">
-      <details style="margin-top:12px" open>
-        <summary><strong>1) Mapeamento de colunas</strong> — defina Dimensões (texto) e Métricas (números)</summary>
-        <div id="mapArea" class="panel" style="margin-top:8px">
-          <div class="note">Detectamos tipos automaticamente (pt‑BR). Você pode ajustar o papel (Dimensão/Métrica/ignorar) e o formato de exibição para métricas.</div>
-          <div id="mapTable" class="scroll" style="margin-top:10px"></div>
-          <div class="btns" style="margin-top:10px">
-            <button id="saveMap" class="primary">Aplicar mapeamento</button>
-            <button id="storeMap">Salvar preferências (local)</button>
-            <button id="downloadMap">Baixar mapeamento</button>
-            <label class="pill">Carregar
-              <input id="uploadMap" type="file" accept="application/json" />
-            </label>
-            <span id="mapStatus" class="muted"></span>
-          </div>
+  <div class="app-shell">
+    <aside id="sidebar" class="collapsed" aria-expanded="false">
+      <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-controls="sidebarContent" aria-expanded="false" data-label-expand="Recolher painel" data-label-collapse="Abrir painel">
+        <span class="icon">☰</span>
+        <span class="label">Abrir painel</span>
+      </button>
+      <div class="sidebar-content" id="sidebarContent">
+        <div class="logo-block">
+<svg width="945" height="326" viewBox="0 0 945 326" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<path d="M383.448 251.995V74.2575H453.571C467.052 74.2575 478.537 76.8321 488.025 81.9814C497.514 87.0729 504.746 94.1604 509.722 103.244C514.755 112.27 517.272 122.684 517.272 134.487C517.272 146.29 514.727 156.704 509.635 165.73C504.544 174.756 497.167 181.785 487.505 186.819C477.9 191.853 466.271 194.369 452.617 194.369H407.922V164.255H446.542C453.774 164.255 459.733 163.011 464.42 160.523C469.164 157.977 472.693 154.477 475.007 150.022C477.38 145.509 478.566 140.331 478.566 134.487C478.566 128.586 477.38 123.436 475.007 119.039C472.693 114.584 469.164 111.142 464.42 108.712C459.675 106.224 453.658 104.98 446.368 104.98H421.027V251.995H383.448Z" fill="#F1F1F1"/>
+<path d="M533.655 251.995V118.692H570.626V251.995H533.655ZM552.227 101.508C546.731 101.508 542.015 99.6858 538.081 96.0408C534.204 92.3379 532.266 87.9118 532.266 82.7625C532.266 77.6711 534.204 73.3028 538.081 69.6578C542.015 65.955 546.731 64.1035 552.227 64.1035C557.723 64.1035 562.41 65.955 566.286 69.6578C570.221 73.3028 572.188 77.6711 572.188 82.7625C572.188 87.9118 570.221 92.3379 566.286 96.0408C562.41 99.6858 557.723 101.508 552.227 101.508Z" fill="#F1F1F1"/>
+<path d="M623.806 118.692L648.279 165.296L673.36 118.692H711.286L672.666 185.344L712.327 251.995H674.575L648.279 205.912L622.417 251.995H584.231L623.806 185.344L585.62 118.692H623.806Z" fill="#F1F1F1"/>
+<path d="M781.367 254.599C767.886 254.599 756.228 251.735 746.392 246.007C736.615 240.221 729.064 232.179 723.741 221.88C718.418 211.524 715.757 199.519 715.757 185.864C715.757 172.094 718.418 160.06 723.741 149.761C729.064 139.405 736.615 131.363 746.392 125.635C756.228 119.849 767.886 116.956 781.367 116.956C794.848 116.956 806.477 119.849 816.255 125.635C826.091 131.363 833.67 139.405 838.993 149.761C844.316 160.06 846.977 172.094 846.977 185.864C846.977 199.519 844.316 211.524 838.993 221.88C833.67 232.179 826.091 240.221 816.255 246.007C806.477 251.735 794.848 254.599 781.367 254.599ZM781.541 225.959C787.674 225.959 792.794 224.224 796.902 220.752C801.01 217.223 804.105 212.421 806.188 206.346C808.329 200.271 809.399 193.357 809.399 185.604C809.399 177.851 808.329 170.937 806.188 164.862C804.105 158.787 801.01 153.985 796.902 150.456C792.794 146.926 787.674 145.162 781.541 145.162C775.35 145.162 770.143 146.926 765.919 150.456C761.754 153.985 758.6 158.787 756.46 164.862C754.377 170.937 753.335 177.851 753.335 185.604C753.335 193.357 754.377 200.271 756.46 206.346C758.6 212.421 761.754 217.223 765.919 220.752C770.143 224.224 775.35 225.959 781.541 225.959Z" fill="#F1F1F1"/>
+<path d="M863.685 251.995V118.692H899.528V141.951H900.917C903.347 133.677 907.426 127.428 913.154 123.205C918.881 118.923 925.477 116.783 932.941 116.783C934.792 116.783 936.788 116.898 938.929 117.13C941.07 117.361 942.95 117.679 944.57 118.084V150.89C942.834 150.369 940.433 149.906 937.367 149.501C934.3 149.096 931.494 148.893 928.949 148.893C923.51 148.893 918.65 150.08 914.368 152.452C910.145 154.766 906.789 158.006 904.301 162.172C901.871 166.337 900.656 171.14 900.656 176.578V251.995H863.685Z" fill="#F1F1F1"/>
+<rect width="326" height="326" rx="163" fill="#F1F1F1"/>
+<path d="M219.175 228.58C219.175 236.983 219.371 242.454 219.762 244.994H183.263V122.77H144.858C142.806 177.58 136.503 215.488 125.949 236.494C124.483 239.523 123.261 241.623 122.284 242.796C121.307 243.871 120.818 244.603 120.818 244.994H84.4658C97.4628 215.488 105.134 185.103 107.479 153.839C108.163 144.069 108.652 133.713 108.945 122.77H83L83.4397 118.96C83.9284 115.736 84.1727 111.779 84.1727 107.089C84.1727 102.302 83.8795 97.27 83.2932 91.9941H246C245.609 96.8792 245.414 101.569 245.414 106.063V114.27C245.414 114.856 245.609 117.69 246 122.77H219.175V228.58Z" fill="#0D0D0D"/>
+</svg>
+          <span class="logo-title">Logo</span>
         </div>
-      </details>
-
-      <details style="margin-top:12px" open>
-        <summary><strong>2) Construtor de Métricas</strong> — aponte colunas‑base (Investimento, Impressões, etc.) e geramos métricas derivadas (CPM, CTR, CPC, ROAS…)</summary>
-        <div class="panel" style="margin-top:8px">
-          <div class="grid cols-6">
-            <label>Produtos
-              <select id="mapProd"></select>
-            </label>
-            <label>Investimento
-              <select id="mapSpend"></select>
-            </label>
-            <label>Impressões
-              <select id="mapImpr"></select>
-            </label>
-            <label>Cliques
-              <select id="mapClicks"></select>
-            </label>
-            <label>Conversões
-              <select id="mapConv"></select>
-            </label>
-            <label>Vendas (valor)
-              <select id="mapRev"></select>
-            </label>
-            <label>Lucro (opcional)
-              <select id="mapProfit"></select>
-            </label>
-            <label class="pill"><input id="optProfitFallback" type="checkbox" checked> Se não houver lucro, usar <em>Vendas − Investimento</em></label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="applyStdMap" class="primary">Gerar/atualizar métricas derivadas</button>
-            <span class="note">Campos derivados: <code>CPM</code>, <code>CTR</code>, <code>CPC</code>, <code>Taxa de conv</code>, <code>ROAS</code>, <code>Ticket médio</code>, <code>Média de invest. por prod.</code>, <code>Média de Custo / Produto</code>.</span>
-          </div>
-          <div id="stdMapStatus" class="note" style="margin-top:6px"></div>
-        </div>
-      </details>
-    </div>
-
-    <div id="section-view" class="hidden">
-      <div class="viewtabs" role="tablist" aria-label="Visualização">
-        <button class="active" data-view="graphs">Gráficos</button>
-        <button data-view="table">Tabela aninhada</button>
+        <nav class="sidebar-nav" aria-label="Seções">
+          <button type="button" data-target="config" aria-controls="section-config" aria-pressed="false">Configuração</button>
+          <button class="active" type="button" data-target="graphs" aria-controls="section-graphs" aria-pressed="true">Área de gráficos</button>
+          <button type="button" data-target="table" aria-controls="section-table" aria-pressed="false">Tabela aninhada</button>
+        </nav>
       </div>
-
-      <div class="view-content">
-        <div id="view-graphs">
-          <details style="margin-top:12px" open>
-            <summary><strong>Visualizações</strong> — Heatmap, Dispersão, Matriz e Insights</summary>
-            <div class="panel" style="margin-top:8px">
-              <div class="tabbar">
-                <button class="active" data-tab="heat">Pivot Heatmap</button>
-                <button data-tab="scatter">Dispersão</button>
-                <button data-tab="matrix">Matriz</button>
-                <button data-tab="insights">Auto‑insights</button>
-              </div>
-
-              <div id="tab-heat">
-          <div class="grid cols-6">
-            <label>Dimensão A
-              <select id="heatDimA"></select>
-            </label>
-            <label>Dimensão B
-              <select id="heatDimB"></select>
-            </label>
-            <label>Métrica
-              <select id="heatMetric"></select>
-            </label>
-            <label>Agregador
-              <select id="heatAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option><option value="count">count</option><option value="countDistinct">countDistinct</option></select>
-            </label>
-            <label>Filtro (coluna)
-              <select id="heatFilterCol"></select>
-            </label>
-            <label>Filtro (valor/padrão)
-              <input id="heatFilterVal" type="text" placeholder="Ex.: Cluster=Core, Impressões>=50000, CTR>=2%" />
-            </label>
+    </aside>
+    <main id="mainContent">
+      <div class="main-wrap">
+        <h1>Octo Correlator <span class="muted">— análise visual & correlações</span></h1>
+        <section id="section-graphs" class="main-section" aria-hidden="false">
+          <div>
+            <h2>Área de gráficos</h2>
+            <p class="muted">Heatmap, dispersão, matriz de correlação e auto‑insights.</p>
           </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runHeat" class="primary">Gerar heatmap</button>
-            <button id="clearHeatFilter">Limpar filtro</button>
-            <button id="exportHeatCsv">Exportar CSV</button>
-          </div>
-          <div id="heatInfo" class="note" style="margin-top:8px"></div>
-          <div id="heatChart" style="margin-top:10px"></div>
-        </div>
-
-        <div id="tab-scatter" class="hidden">
-          <div class="grid cols-6">
-            <label>X (métrica)
-              <select id="scX"></select>
-            </label>
-            <label>Y (métrica)
-              <select id="scY"></select>
-            </label>
-            <label>Cor (dimensão)
-              <select id="scColor"></select>
-            </label>
-            <label>Tamanho (métrica)
-              <select id="scSize"></select>
-            </label>
-            <label>Filtro (coluna)
-              <select id="scFilterCol"></select>
-            </label>
-            <label>Filtro (valor/padrão)
-              <input id="scFilterVal" type="text" placeholder="Ex.: Categoria=Shoes, Cliques>=1000" />
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runScatter" class="primary">Gerar dispersão</button>
-            <button id="clearScatterFilter">Limpar filtro</button>
-          </div>
-          <div id="scInfo" class="note" style="margin-top:8px"></div>
-          <div id="scatterChart" style="margin-top:10px"></div>
-        </div>
-
-        <div id="tab-matrix" class="hidden">
-          <div class="grid cols-6">
-            <label>Métricas (CTRL/CMD para múltiplas)
-              <select id="mxMetrics" multiple size="8"></select>
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runMatrix" class="primary">Gerar matriz</button>
-            <button id="clearMatrixSel">Limpar seleção</button>
-          </div>
-          <div id="matrixChart" style="margin-top:10px"></div>
-        </div>
-
-        <div id="tab-insights" class="hidden">
-          <div class="grid cols-6">
-            <label>Dimensão
-              <select id="inDim"></select>
-            </label>
-            <label>Métrica
-              <select id="inMetric"></select>
-            </label>
-            <label>Agregador
-              <select id="inAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option></select>
-            </label>
-            <label>Top N
-              <input id="inTopN" type="number" value="5" min="1" />
-            </label>
-            <label>Filtro (coluna)
-              <select id="inFilterCol"></select>
-            </label>
-            <label>Filtro (valor/padrão)
-              <input id="inFilterVal" type="text" placeholder="Ex.: ROAS>=2, Cluster=Core" />
-            </label>
-          </div>
-          <div class="btns" style="margin-top:10px">
-            <button id="runInsights" class="primary">Rodar insights</button>
-            <button id="clearInsightsFilter">Limpar filtro</button>
-          </div>
-          <div id="insightsArea" style="margin-top:10px"></div>
+          <div class="panel">
+            <div class="tabbar">
+              <button class="active" data-tab="heat">Pivot Heatmap</button>
+              <button data-tab="scatter">Dispersão</button>
+              <button data-tab="matrix">Matriz</button>
+              <button data-tab="insights">Auto‑insights</button>
             </div>
-          </details>
-        </div>
 
-        <div id="view-table" class="hidden">
-          <details style="margin-top:12px" open>
-            <summary><strong>Tabela aninhada</strong> — selecione 2 dimensões (ex.: Cluster → Categoria) e visualize todas as métricas agregadas</summary>
-            <div class="panel" style="margin-top:8px">
+            <div id="tab-heat">
               <div class="grid cols-6">
-                <label>Dimensão Pai (nível 1)
-                  <select id="treeDimA"></select>
+                <label>Dimensão A
+                  <select id="heatDimA"></select>
                 </label>
-                <label>Dimensão Filha (nível 2)
-                  <select id="treeDimB"></select>
+                <label>Dimensão B
+                  <select id="heatDimB"></select>
+                </label>
+                <label>Métrica
+                  <select id="heatMetric"></select>
+                </label>
+                <label>Agregador
+                  <select id="heatAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option><option value="count">count</option><option value="countDistinct">countDistinct</option></select>
                 </label>
                 <label>Filtro (coluna)
-                  <select id="treeFilterCol"></select>
+                  <select id="heatFilterCol"></select>
                 </label>
                 <label>Filtro (valor/padrão)
-                  <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
-                </label>
-                <label>Ordenar por
-                  <select id="treeOrderBy"></select>
-                </label>
-                <label>Ordem
-                  <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
+                  <input id="heatFilterVal" type="text" placeholder="Ex.: Cluster=Core, Impressões>=50000, CTR>=2%" />
                 </label>
               </div>
               <div class="btns" style="margin-top:10px">
-                <button id="runTree" class="primary">Gerar tabela</button>
-                <button id="exportTreeCsv">Exportar CSV</button>
+                <button id="runHeat" class="primary">Gerar heatmap</button>
+                <button id="clearHeatFilter">Limpar filtro</button>
+                <button id="exportHeatCsv">Exportar CSV</button>
               </div>
-              <div id="treeArea" style="margin-top:10px"></div>
+              <div id="heatInfo" class="note" style="margin-top:8px"></div>
+              <div id="heatChart" style="margin-top:10px"></div>
+            </div>
+
+            <div id="tab-scatter" class="hidden">
+              <div class="grid cols-6">
+                <label>X (métrica)
+                  <select id="scX"></select>
+                </label>
+                <label>Y (métrica)
+                  <select id="scY"></select>
+                </label>
+                <label>Cor (dimensão)
+                  <select id="scColor"></select>
+                </label>
+                <label>Tamanho (métrica)
+                  <select id="scSize"></select>
+                </label>
+                <label>Filtro (coluna)
+                  <select id="scFilterCol"></select>
+                </label>
+                <label>Filtro (valor/padrão)
+                  <input id="scFilterVal" type="text" placeholder="Ex.: Categoria=Shoes, Cliques>=1000" />
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runScatter" class="primary">Gerar dispersão</button>
+                <button id="clearScatterFilter">Limpar filtro</button>
+              </div>
+              <div id="scInfo" class="note" style="margin-top:8px"></div>
+              <div id="scatterChart" style="margin-top:10px"></div>
+            </div>
+
+            <div id="tab-matrix" class="hidden">
+              <div class="grid cols-6">
+                <label>Métricas (CTRL/CMD para múltiplas)
+                  <select id="mxMetrics" multiple size="8"></select>
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runMatrix" class="primary">Gerar matriz</button>
+                <button id="clearMatrixSel">Limpar seleção</button>
+              </div>
+              <div id="matrixChart" style="margin-top:10px"></div>
+            </div>
+
+            <div id="tab-insights" class="hidden">
+              <div class="grid cols-6">
+                <label>Dimensão
+                  <select id="inDim"></select>
+                </label>
+                <label>Métrica
+                  <select id="inMetric"></select>
+                </label>
+                <label>Agregador
+                  <select id="inAgg"><option value="mean" selected>mean</option><option value="sum">sum</option><option value="median">median</option><option value="min">min</option><option value="max">max</option></select>
+                </label>
+                <label>Top N
+                  <input id="inTopN" type="number" value="5" min="1" />
+                </label>
+                <label>Filtro (coluna)
+                  <select id="inFilterCol"></select>
+                </label>
+                <label>Filtro (valor/padrão)
+                  <input id="inFilterVal" type="text" placeholder="Ex.: ROAS>=2, Cluster=Core" />
+                </label>
+              </div>
+              <div class="btns" style="margin-top:10px">
+                <button id="runInsights" class="primary">Rodar insights</button>
+                <button id="clearInsightsFilter">Limpar filtro</button>
+              </div>
+              <div id="insightsArea" style="margin-top:10px"></div>
+            </div>
+          </div>
+
+          <details style="margin-top:12px">
+            <summary><strong>Ajuda rápida</strong></summary>
+            <div class="panel" style="margin-top:8px">
+              <ul>
+                <li>Faça upload de <strong>CSV</strong> (pt‑BR ou en‑US) ou <strong>Excel</strong> (primeira planilha).</li>
+                <li>Revise o <strong>mapeamento</strong>: marque cada coluna como <span class="tag dim">Dimensão</span> (texto) ou <span class="tag met">Métrica</span> (número). Colunas em branco/ajuda podem ser <em>ignoradas</em>.</li>
+                <li>No Pivot Heatmap, escolha <em>Dimensão A</em>, <em>Dimensão B</em>, <em>Métrica</em> e um <em>agregador</em> (ex.: <code>mean</code> de ROAS por <code>Cluster × Categoria</code>).</li>
+                <li>Em Dispersão, selecione duas métricas e veja o <strong>r de Pearson</strong> para avaliar correlação linear.</li>
+                <li>Na Matriz, gere o mapa de correlação entre várias métricas de uma vez.</li>
+                <li>Em Auto‑insights, liste Top/Bottom por dimensão com filtros mínimos (ex.: <code>Impressões ≥ 50.000</code>).</li>
+              </ul>
+              <div class="note">Tudo roda 100% no navegador. O mapeamento pode ser salvo no seu <em>localStorage</em>.</div>
             </div>
           </details>
-        </div>
+        </section>
+
+        <section id="section-table" class="main-section hidden" aria-hidden="true">
+          <div>
+            <h2>Tabela aninhada</h2>
+            <p class="muted">Selecione 2 dimensões (ex.: Cluster → Categoria) e visualize as métricas agregadas.</p>
+          </div>
+          <div class="panel">
+            <div class="grid cols-6">
+              <label>Dimensão Pai (nível 1)
+                <select id="treeDimA"></select>
+              </label>
+              <label>Dimensão Filha (nível 2)
+                <select id="treeDimB"></select>
+              </label>
+              <label>Filtro (coluna)
+                <select id="treeFilterCol"></select>
+              </label>
+              <label>Filtro (valor/padrão)
+                <input id="treeFilterVal" type="text" placeholder="ex.: Cluster=Core ou Impressões≥50000" />
+              </label>
+              <label>Ordenar por
+                <select id="treeOrderBy"></select>
+              </label>
+              <label>Ordem
+                <select id="treeOrderDir"><option value="desc" selected>desc</option><option value="asc">asc</option></select>
+              </label>
+            </div>
+            <div class="btns" style="margin-top:10px">
+              <button id="runTree" class="primary">Gerar tabela</button>
+              <button id="exportTreeCsv">Exportar CSV</button>
+            </div>
+            <div id="treeArea" style="margin-top:10px"></div>
+          </div>
+        </section>
+
+        <section id="section-config" class="main-section hidden" aria-hidden="true">
+          <div>
+            <h2>Dataset</h2>
+            <div class="section-card">
+              <label for="file" class="file-label">
+                <span>Arquivo</span>
+                <input id="file" type="file" accept=".csv,.xlsx,.xls" />
+              </label>
+              <div class="dataset-options">
+                <label>Separador CSV
+                  <select id="csvDelim">
+                    <option value="," selected>Vírgula ,</option>
+                    <option value=";">Ponto-e-vírgula ;</option>
+                    <option value="\t">Tab</option>
+                  </select>
+                </label>
+                <label>Formato numérico
+                  <select id="locale">
+                    <option value="pt-BR" selected>pt‑BR (1.234,56 / R$ / %)</option>
+                    <option value="en-US">en‑US (1,234.56 / $ / %)</option>
+                  </select>
+                </label>
+              </div>
+              <button id="btnClear">Limpar dataset</button>
+              <div id="loadedInfo" class="muted"></div>
+            </div>
+          </div>
+
+          <div>
+            <h2>Mapeamento & Métricas</h2>
+            <details style="margin-top:12px" open>
+              <summary><strong>1) Mapeamento de colunas</strong> — defina Dimensões (texto) e Métricas (números)</summary>
+              <div id="mapArea" class="panel" style="margin-top:8px">
+                <div class="note">Detectamos tipos automaticamente (pt‑BR). Você pode ajustar o papel (Dimensão/Métrica/ignorar) e o formato de exibição para métricas.</div>
+                <div id="mapTable" class="scroll" style="margin-top:10px"></div>
+                <div class="btns" style="margin-top:10px">
+                  <button id="saveMap" class="primary">Aplicar mapeamento</button>
+                  <button id="storeMap">Salvar preferências (local)</button>
+                  <button id="downloadMap">Baixar mapeamento</button>
+                  <label class="pill">Carregar
+                    <input id="uploadMap" type="file" accept="application/json" />
+                  </label>
+                  <span id="mapStatus" class="muted"></span>
+                </div>
+              </div>
+            </details>
+
+            <details style="margin-top:12px" open>
+              <summary><strong>2) Construtor de Métricas</strong> — aponte colunas‑base (Investimento, Impressões, etc.) e geramos métricas derivadas (CPM, CTR, CPC, ROAS…)</summary>
+              <div class="panel" style="margin-top:8px">
+                <div class="grid cols-6">
+                  <label>Produtos
+                    <select id="mapProd"></select>
+                  </label>
+                  <label>Investimento
+                    <select id="mapSpend"></select>
+                  </label>
+                  <label>Impressões
+                    <select id="mapImpr"></select>
+                  </label>
+                  <label>Cliques
+                    <select id="mapClicks"></select>
+                  </label>
+                  <label>Conversões
+                    <select id="mapConv"></select>
+                  </label>
+                  <label>Vendas (valor)
+                    <select id="mapRev"></select>
+                  </label>
+                  <label>Lucro (opcional)
+                    <select id="mapProfit"></select>
+                  </label>
+                  <label class="pill"><input id="optProfitFallback" type="checkbox" checked> Se não houver lucro, usar <em>Vendas − Investimento</em></label>
+                </div>
+                <div class="btns" style="margin-top:10px">
+                  <button id="applyStdMap" class="primary">Gerar/atualizar métricas derivadas</button>
+                  <span class="note">Campos derivados: <code>CPM</code>, <code>CTR</code>, <code>CPC</code>, <code>Taxa de conv</code>, <code>ROAS</code>, <code>Ticket médio</code>, <code>Média de invest. por prod.</code>, <code>Média de Custo / Produto</code>.</span>
+                </div>
+                <div id="stdMapStatus" class="note" style="margin-top:6px"></div>
+              </div>
+            </details>
+          </div>
+          <div class="btns" style="margin-top:16px">
+            <button id="finishConfig" class="primary" type="button">Finalizar</button>
+          </div>
+        </section>
+
+        <div class="footer">Feito para OctoShop · v1.1 — <span class="muted">HTML + JS puro (Plotly, PapaParse, SheetJS)</span></div>
       </div>
-    </div>
-
-    
-
-    <details style="margin-top:12px">
-      <summary><strong>Ajuda rápida</strong></summary>
-      <div class="panel" style="margin-top:8px">
-        <ul>
-          <li>Faça upload de <strong>CSV</strong> (pt‑BR ou en‑US) ou <strong>Excel</strong> (primeira planilha).</li>
-          <li>Revise o <strong>mapeamento</strong>: marque cada coluna como <span class="tag dim">Dimensão</span> (texto) ou <span class="tag met">Métrica</span> (número). Colunas em branco/ajuda podem ser <em>ignoradas</em>.</li>
-          <li>No Pivot Heatmap, escolha <em>Dimensão A</em>, <em>Dimensão B</em>, <em>Métrica</em> e um <em>agregador</em> (ex.: <code>mean</code> de ROAS por <code>Cluster × Categoria</code>).</li>
-          <li>Em Dispersão, selecione duas métricas e veja o <strong>r de Pearson</strong> para avaliar correlação linear.</li>
-          <li>Na Matriz, gere o mapa de correlação entre várias métricas de uma vez.</li>
-          <li>Em Auto‑insights, liste Top/Bottom por dimensão com filtros mínimos (ex.: <code>Impressões ≥ 50.000</code>).</li>
-        </ul>
-        <div class="note">Tudo roda 100% no navegador. O mapeamento pode ser salvo no seu <em>localStorage</em>.</div>
-      </div>
-    </details>
-
-    <div class="footer">Feito para OctoShop · v1.1 — <span class="muted">HTML + JS puro (Plotly, PapaParse, SheetJS)</span></div>
+    </main>
   </div>
 
 <script>
@@ -353,15 +399,15 @@ const state = {
 // Tema/estilo Plotly (alto contraste)
 // ==========================
 const PLOTLY_THEME = {
-  fontColor: '#ffffff',
-  axisColor: '#ffffff',
-  gridColor: '#3a4155',
-  zeroLineColor: '#6b7280',
+  fontColor: '#F5F5F5',
+  axisColor: '#97938A',
+  gridColor: '#58554F',
+  zeroLineColor: '#8E8881',
   paperBg: 'rgba(0,0,0,0)',
   plotBg: 'rgba(0,0,0,0)',
-  hoverBg: '#111827',
-  hoverBorder: '#374151',
-  colorway: ['#60a5fa','#f59e0b','#10b981','#ef4444','#a78bfa','#f472b6','#22d3ee']
+  hoverBg: '#252525',
+  hoverBorder: '#8E8881',
+  colorway: ['#8E8881','#97938A','#58554F','#F5F5F5','#3C3B36','#B0ACA4','#1B1B1B']
 };
 
 function baseLayout(overrides={}){
@@ -378,6 +424,16 @@ function baseLayout(overrides={}){
 }
 
 const byId = id => document.getElementById(id);
+function triggerPlotlyResize(){
+  const plotlyResize = window.Plotly?.Plots?.resize;
+  if (!plotlyResize) return;
+  for (const id of ['heatChart','scatterChart','matrixChart']){
+    const el = byId(id);
+    if (el && el.offsetParent){
+      plotlyResize(el);
+    }
+  }
+}
 function getValue(id){ return byId(id)?.value || ''; }
 
 function parseNumberLocale(v, locale){
@@ -1219,30 +1275,70 @@ for (const btn of document.querySelectorAll('.tabbar button')){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
 // ==========================
-// Navegação: Etapas e Visualização
+// Sidebar retrátil
 // ==========================
-// Etapas (Configuração / Visualização)
-document.querySelectorAll('.sectionbar button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.sectionbar button').forEach(b=> b.classList.remove('active'));
-    btn.classList.add('active');
-    const sec = btn.getAttribute('data-section');
-    const isConfig = sec === 'config';
-    byId('section-config').classList.toggle('hidden', !isConfig);
-    byId('section-view').classList.toggle('hidden', isConfig);
+const sidebar = byId('sidebar');
+const sidebarToggle = byId('sidebarToggle');
+if (sidebar && sidebarToggle){
+  const labelEl = sidebarToggle.querySelector('.label');
+  const collapsedText = sidebarToggle.dataset.labelCollapse || 'Abrir painel';
+  const expandedText = sidebarToggle.dataset.labelExpand || 'Recolher painel';
+  const applyLabels = ()=>{
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    const expanded = !isCollapsed;
+    sidebarToggle.setAttribute('aria-expanded', String(expanded));
+    sidebar.setAttribute('aria-expanded', String(expanded));
+    sidebarToggle.setAttribute('aria-label', expanded ? expandedText : collapsedText);
+    if (labelEl){
+      labelEl.textContent = expanded ? expandedText : collapsedText;
+    }
+  };
+  sidebarToggle.addEventListener('click', ()=>{
+    sidebar.classList.toggle('collapsed');
+    applyLabels();
+    window.requestAnimationFrame(triggerPlotlyResize);
+    setTimeout(triggerPlotlyResize, 320);
   });
-});
+  applyLabels();
+}
 
-// Abas de visualização (Gráficos / Tabela)
-document.querySelectorAll('.viewtabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.viewtabs button').forEach(b=> b.classList.remove('active'));
-    btn.classList.add('active');
-    const view = btn.getAttribute('data-view');
-    byId('view-graphs').classList.toggle('hidden', view !== 'graphs');
-    byId('view-table').classList.toggle('hidden', view !== 'table');
+const navButtons = Array.from(document.querySelectorAll('.sidebar-nav button'));
+function setSection(target){
+  if (!navButtons.length) return;
+  navButtons.forEach(btn=>{
+    const isActive = btn.dataset.target === target;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', String(isActive));
   });
+  document.querySelectorAll('.main-section').forEach(section=>{
+    const show = section.id === `section-${target}`;
+    section.classList.toggle('hidden', !show);
+    section.setAttribute('aria-hidden', String(!show));
+  });
+  triggerPlotlyResize();
+  if (target === 'graphs'){
+    window.requestAnimationFrame(triggerPlotlyResize);
+    setTimeout(triggerPlotlyResize, 320);
+  }
+}
+
+if (navButtons.length){
+  navButtons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = btn.dataset.target;
+      if (!target) return;
+      setSection(target);
+    });
+  });
+  const initial = document.querySelector('.sidebar-nav button.active')?.dataset.target || navButtons[0].dataset.target;
+  if (initial){
+    setSection(initial);
+  }
+}
+
+byId('finishConfig')?.addEventListener('click', ()=>{
+  setSection('graphs');
 });
-</script >
+</script>
 </body>
 </html>
