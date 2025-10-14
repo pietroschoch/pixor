@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Octo Correlator — análise visual e correlações</title>
+  <title>Correlator — análise visual e correlações</title>
   <!-- Libs via CDN (somente client-side) -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -45,7 +45,7 @@
     .sidebar-nav button:hover{background:rgba(142,136,129,0.16)}
     .sidebar-nav button.active{background:var(--accent-strong);border-color:var(--accent-strong)}
     #mainContent{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
-    .main-wrap{max-width:1940px;width:100%;margin:24px auto;padding:0 24px 32px}
+    .main-wrap{max-width:100%;width:100%;margin:24px auto;padding:0 24px 32px}
     #heatChart,#scatterChart,#matrixChart,#treeArea{width:100%}
     .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px}
     .section-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:grid;gap:12px}
@@ -122,10 +122,6 @@
     <main id="mainContent">
       <div class="main-wrap">
         <section id="section-graphs" class="main-section" aria-hidden="false">
-          <div>
-            <h2>Área de gráficos</h2>
-            <p class="muted">Heatmap, dispersão, matriz de correlação e auto‑insights.</p>
-          </div>
           <div class="panel">
             <div class="tabbar">
               <button class="active" data-tab="heat">Pivot Heatmap</button>
@@ -252,10 +248,6 @@
         </section>
 
         <section id="section-table" class="main-section hidden" aria-hidden="true">
-          <div>
-            <h2>Tabela aninhada</h2>
-            <p class="muted">Selecione 2 dimensões (ex.: Cluster → Categoria) e visualize as métricas agregadas.</p>
-          </div>
           <div class="panel">
             <div class="grid cols-6">
               <label>Dimensão Pai (nível 1)
@@ -372,7 +364,7 @@
           </div>
         </section>
 
-        <div class="footer">Feito para OctoShop · v1.1 — <span class="muted">HTML + JS puro (Plotly, PapaParse, SheetJS)</span></div>
+        <div class="footer">Feito por Pixor · v1.1 — <span class="muted">HTML + JS puro (Plotly, PapaParse, SheetJS)</span></div>
       </div>
     </main>
   </div>
@@ -737,7 +729,7 @@ byId('applyStdMap').addEventListener('click', ()=>{
 });
 
 // ===== Persistência de mapeamento (local e arquivo)
-function buildMappingKey(){
+function buildMappingKey(){ 
   return 'octo-correlator:mapping:'+ (state.fileKey||'') + ':' + state.cols.join('|');
 }
 function currentMappingPayload(){
