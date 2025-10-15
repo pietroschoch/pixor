@@ -45,9 +45,9 @@
     .sidebar-nav button:hover{background:rgba(142,136,129,0.16)}
     .sidebar-nav button.active{background:var(--accent-strong);border-color:var(--accent-strong)}
     #mainContent{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
-    .main-wrap{max-width:100%;width:100%;margin:24px auto;padding:0 24px 32px}
+    .main-wrap{max-width:100%;width:100%;margin:24px auto;padding:0 24px 32px;height: 100%;}
     #heatChart,#scatterChart,#matrixChart,#treeArea{width:100%}
-    .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;height: 100%;display:flex;flex-direction:column}
     .section-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:grid;gap:12px}
     .section-card label:not(.pill){display:flex;flex-direction:column;gap:6px;font-weight:600}
     .section-card input[type=file]{padding:8px;background:var(--surface);border:1px dashed var(--border);border-radius:12px;color:var(--text)}
@@ -63,12 +63,14 @@
     .btns button:not(.primary):hover{background:rgba(142,136,129,0.16)}
     .grid{display:grid; gap:10px}
     .grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
-    .grid.cols-6{grid-template-columns:repeat(6,minmax(0,1fr))}
+    .grid.cols-6{grid-template-columns:repeat(6,minmax(0,1fr))} 
     .scroll{overflow:auto; max-height:360px; border:1px solid var(--border); border-radius:14px; width:100%; background:var(--surface)}
-    #treeArea .scroll{max-height:720px}
+    #treeArea .scroll{max-height:calc(100vh - 260px)}
     table{width:100%; border-collapse:collapse; min-width:720px}
     th,td{padding:8px 10px; border-bottom:1px solid var(--border)}
     th{text-align:left; color:var(--text); position:sticky; top:0; background:var(--panel)}
+    th.sortable{cursor:pointer}
+    th.sortable:focus-visible{outline:2px solid var(--accent-strong); outline-offset:2px}
     .table-zebra tbody tr:nth-child(odd){ background:#1b1b1b }
     .table-zebra tbody tr:nth-child(even){ background:#151515 }
     .table-zebra tbody tr:hover{ background:#1f1f1f }
@@ -76,6 +78,8 @@
     td.dim{ white-space:nowrap }
     .row-a td:first-child{ font-weight:700 }
     .row-b td:first-child{ padding-left:16px }
+    .row-total td{ font-weight:700; border-top:1px solid var(--border); background:#1b1b1b }
+    .row-total td.dim{ padding-left:0 }
     .tag{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;background:var(--surface)}
     .tag.dim{background:rgba(142,136,129,0.16)}
     .tag.met{background:rgba(88,85,79,0.26)}
@@ -83,13 +87,16 @@
     .pill{display:inline-block;border:1px solid var(--border);padding:6px 10px;border-radius:999px}
     .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .note{font-size:12px;color:var(--muted)}
-    .footer{margin:18px 0 8px; font-size:12px; color:var(--muted)}
     .btns{display:flex; gap:8px; flex-wrap:wrap}
     .tabbar{display:flex; gap:6px; margin:8px 0}
     .tabbar button{padding:8px 12px;border-radius:12px;border:1px solid var(--border);background:transparent}
     .tabbar button.active{background:var(--accent-strong); border-color:var(--accent-strong)}
     .hidden{display:none !important}
-    .main-section{margin-top:24px;display:flex;flex-direction:column;gap:20px}
+    .main-section{margin-top:24px;display:flex;flex-direction:column;gap:20px;height: 100%;}
+    /* áreas de abas ocupam altura total do painel */
+    #tab-heat,#tab-scatter,#tab-matrix{display:flex;flex-direction:column;gap:10px;min-height:0;height:100%}
+    /* gráficos expandem para ocupar o restante da altura */
+    #heatChart,#scatterChart,#matrixChart{flex:1;min-height:280px}
   </style>
 </head>
 <body>
@@ -363,8 +370,6 @@
             <button id="finishConfig" class="primary" type="button">Finalizar</button>
           </div>
         </section>
-
-        <div class="footer">Feito por Pixor · v1.1 — <span class="muted">HTML + JS puro (Plotly, PapaParse, SheetJS)</span></div>
       </div>
     </main>
   </div>
@@ -384,6 +389,14 @@ const state = {
     produtos: '', investimento: '', imp: '', cliques: '', conv: '', vendas: '', lucro: ''
   },
   derivedAdded: false,
+  tree: {
+    data: [],
+    summary: null,
+    dimA: '',
+    dimB: '',
+    sortKey: '',
+    sortDir: 'desc'
+  }
 };
 
 // ==========================
@@ -395,7 +408,7 @@ const PLOTLY_THEME = {
   gridColor: '#58554F',
   zeroLineColor: '#8E8881',
   paperBg: 'rgba(0,0,0,0)',
-  plotBg: 'rgba(0,0,0,0)',
+  plotBg: 'rgba(0,0,0,0)', 
   hoverBg: '#252525',
   hoverBorder: '#8E8881',
   colorway: ['#8E8881','#97938A','#58554F','#F5F5F5','#3C3B36','#B0ACA4','#1B1B1B']
@@ -403,6 +416,7 @@ const PLOTLY_THEME = {
 
 function baseLayout(overrides={}){
   return Object.assign({
+    autosize: true,
     paper_bgcolor: PLOTLY_THEME.paperBg,
     plot_bgcolor: PLOTLY_THEME.plotBg,
     margin: {l:60,r:10,t:30,b:60},
@@ -629,7 +643,14 @@ byId('storeMap').addEventListener('click', ()=>{
 });
 
 byId('btnClear').addEventListener('click', ()=>{
-  state.rawRows = []; state.rows = []; state.cols = []; state.meta = {}; state.fileKey=null; state.std={produtos:'',investimento:'',imp:'',cliques:'',conv:'',vendas:'',lucro:''}; state.derivedAdded=false;
+  state.rawRows = [];
+  state.rows = [];
+  state.cols = [];
+  state.meta = {};
+  state.fileKey = null;
+  state.std = {produtos:'',investimento:'',imp:'',cliques:'',conv:'',vendas:'',lucro:''};
+  state.derivedAdded = false;
+  state.tree = {data:[], summary:null, dimA:'', dimB:'', sortKey:'', sortDir:'desc'};
   byId('file').value = '';
   byId('loadedInfo').textContent = '';
   byId('mapTable').innerHTML = '';
@@ -660,7 +681,7 @@ function populateSelectors(){
   fillSelect('inDim', dims);
   fillSelect('inMetric', mets);
   fillSelect('inFilterCol', mets.concat(dims));
-  fillSelect('treeOrderBy', ['Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto']);
+  fillSelect('treeOrderBy', ['Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','Conversões','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto']);
   // Tabela aninhada: preencher selects de dimensões e filtro
   fillSelect('treeDimA', dims);
   fillSelect('treeDimB', dims);
@@ -1144,18 +1165,18 @@ byId('runTree')?.addEventListener('click', ()=>{
   const dir = byId('treeOrderDir').value || 'desc';
   if (!A || !B) return alert('Selecione as duas dimensões.');
   const rows = applyFilterSmart(state.rows, fcol, fval);
-  const data = buildTreeAgg(rows, A, B);
-  const sorter = (a,b)=> (dir==='asc'? ( (a[orderBy]||0)-(b[orderBy]||0) ) : ( (b[orderBy]||0)-(a[orderBy]||0) ));
-  data.sort(sorter); for(const n of data){ n.children.sort(sorter); }
-  renderTreeTable(data, A, B);
-  byId('exportTreeCsv').onclick = ()=> exportTreeCsv(data, A, B);
+  const {nodes, summary} = buildTreeAgg(rows, A, B);
+  state.tree = {data: nodes, summary, dimA: A, dimB: B, sortKey: orderBy, sortDir: dir};
+  renderTreeTable();
+  const exportBtn = byId('exportTreeCsv');
+  if (exportBtn) exportBtn.onclick = exportTreeCsv;
 });
 
 function sumBy(rows, col){ return rows.reduce((acc,r)=> acc + (Number(r[col])||0), 0); }
 function countDistinctBy(rows, col){ const s=new Set(); for(const r of rows){ s.add(String(r[col]??'')); } return s.size; }
 function buildTreeAgg(rows, A, B){
   const S = state.std;
-  const groupsA = groupBy(rows, r=> String(r[A]??'')); 
+  const groupsA = groupBy(rows, r=> String(r[A]??''));
   // Total de produtos depende do tipo da coluna mapeada
   const prodIsMetric = S.produtos && state.meta[S.produtos]?.role === 'metric';
   const total = {
@@ -1163,6 +1184,7 @@ function buildTreeAgg(rows, A, B){
     investimento: S.investimento? sumBy(rows, S.investimento): 0,
     vendas: S.vendas? sumBy(rows, S.vendas): 0
   };
+  const summary = aggregateBlock(rows, total);
   const result = [];
   for (const [aKey, arrA] of groupsA){
     const aggA = aggregateBlock(arrA, total);
@@ -1173,8 +1195,8 @@ function buildTreeAgg(rows, A, B){
       result[result.length-1].children.push({ level:'B', key:bKey, ...aggB });
     }
   }
-  return result;
-} 
+  return {nodes: result, summary};
+}
 
 function aggregateBlock(rows, total){
   const S = state.std;
@@ -1204,6 +1226,7 @@ function aggregateBlock(rows, total){
     'Impressões': impr,
     'CTR': safeDiv(clk, impr),
     'Cliques': clk,
+    'Conversões': conv,
     'CPC': safeDiv(spend, clk),
     'Taxa de conv': safeDiv(conv, clk),
     'Vendas': rev,
@@ -1216,13 +1239,80 @@ function aggregateBlock(rows, total){
   };
 }
 
-function renderTreeTable(data, A, B){
-  const headers = ['Dimensão','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
-  const fmt = {
-    'Produtos':'number','% prod.':'percent','Investimento':'currency','% inv.':'percent','CPM':'currency','Impressões':'number','CTR':'percent','Cliques':'number','CPC':'currency','Taxa de conv':'percent','Vendas':'currency','%':'percent','ROAS':'number','Ticket médio':'currency','Lucro':'currency','Média de invest. por prod.':'currency','Média de Custo / Produto':'percent'
+function treeSortTarget(sortKey){
+  return sortKey === 'Dimensão' ? 'key' : sortKey;
+}
+
+function buildTreeComparator(sortKey, dir){
+  if (sortKey === 'key'){
+    const direction = dir === 'asc' ? 1 : -1;
+    return (a, b)=> a.key.localeCompare(b.key, state.locale, {sensitivity:'base'}) * direction;
+  }
+  return (a, b)=>{
+    const va = Number(a[sortKey]);
+    const vb = Number(b[sortKey]);
+    const aValid = Number.isFinite(va);
+    const bValid = Number.isFinite(vb);
+    if (!aValid && !bValid){
+      return a.key.localeCompare(b.key, state.locale, {sensitivity:'base'});
+    }
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return a.key.localeCompare(b.key, state.locale, {sensitivity:'base'});
   };
+}
+
+function sortTreeData(nodes, sortKey, dir){
+  const comparator = buildTreeComparator(sortKey, dir);
+  nodes.sort(comparator);
+  for (const node of nodes){
+    node.children.sort(comparator);
+  }
+}
+
+function renderTreeTable(){
+  const area = byId('treeArea');
+  if (!area) return;
+  const tree = state.tree || {};
+  const data = Array.isArray(tree.data) ? tree.data : [];
+  const summary = tree.summary || null;
+  const headers = ['Dimensão','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','Conversões','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
+  const fmt = {
+    'Produtos':'number','% prod.':'percent','Investimento':'currency','% inv.':'percent','CPM':'currency','Impressões':'number','CTR':'percent','Cliques':'number','Conversões':'number','CPC':'currency','Taxa de conv':'percent','Vendas':'currency','%':'percent','ROAS':'number','Ticket médio':'currency','Lucro':'currency','Média de invest. por prod.':'currency','Média de Custo / Produto':'percent'
+  };
+  if (!data.length){
+    area.innerHTML = '<div class="note">Nenhum dado encontrado para os filtros atuais.</div>';
+    return;
+  }
   const numericHeaders = new Set(headers.slice(1));
-  let html = '<div class="scroll"><table class="table-zebra"><thead><tr>' + headers.map((h,i)=>`<th${i>0? ' class="num"':''}>${h}</th>`).join('') + '</tr></thead><tbody>';
+  const currentSortKey = (tree.sortKey && headers.includes(tree.sortKey)) ? tree.sortKey : 'Produtos';
+  const currentSortDir = tree.sortDir === 'asc' ? 'asc' : 'desc';
+  tree.sortKey = currentSortKey;
+  tree.sortDir = currentSortDir;
+  sortTreeData(data, treeSortTarget(currentSortKey), currentSortDir);
+  const headerRow = headers.map((h,i)=>{
+    const sortable = h === 'Dimensão' || numericHeaders.has(h);
+    const isActive = h === currentSortKey;
+    const indicator = isActive ? (currentSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    const classes = [];
+    if (i>0) classes.push('num');
+    if (sortable) classes.push('sortable');
+    const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
+    const attrs = [];
+    if (sortable){
+      attrs.push(`data-sort-key="${h}"`);
+      attrs.push('role="button"');
+      attrs.push('tabindex="0"');
+      attrs.push(`aria-sort="${isActive ? (currentSortDir === 'asc' ? 'ascending' : 'descending') : 'none'}"`);
+    }
+    const attrStr = attrs.length ? ' ' + attrs.join(' ') : '';
+    return `<th${classAttr}${attrStr}>${h}${indicator}</th>`;
+  }).join('');
+  const A = tree.dimA || '';
+  const B = tree.dimB || '';
+  let html = `<div class="scroll"><table class="table-zebra"><thead><tr>${headerRow}</tr></thead><tbody>`;
   for (const node of data){
     const rowA = [ `<strong>${escapeHtml(A)}: ${escapeHtml(node.key)}</strong>`, ...headers.slice(1).map(h=> formatValue(node[h], fmt[h])) ];
     html += '<tr class="row-a">' + rowA.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
@@ -1231,17 +1321,80 @@ function renderTreeTable(data, A, B){
       html += '<tr class="row-b">' + rowB.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
     }
   }
+  if (summary){
+    const totalRow = [ '<strong>Total geral</strong>', ...headers.slice(1).map(h=> formatValue(summary[h], fmt[h])) ];
+    html += '<tr class="row-total">' + totalRow.map((td,i)=> i===0? `<td class="dim">${td}</td>` : `<td class="num">${td}</td>`).join('') + '</tr>';
+  }
   html += '</tbody></table></div>';
-  byId('treeArea').innerHTML = html;
+  area.innerHTML = html;
+  area.querySelectorAll('th[data-sort-key]').forEach(th=>{
+    const key = th.getAttribute('data-sort-key');
+    th.addEventListener('click', ()=> handleTreeSort(key));
+    th.addEventListener('keydown', e=>{
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        handleTreeSort(key);
+      }
+    });
+  });
 }
 
-function exportTreeCsv(data, A, B){
-  const headers = ['Nivel','Chave','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
+function handleTreeSort(header){
+  if (!state.tree || !Array.isArray(state.tree.data) || !state.tree.data.length) return;
+  const prevKey = state.tree.sortKey;
+  let dir;
+  if (header === prevKey){
+    dir = state.tree.sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    dir = header === 'Dimensão' ? 'asc' : 'desc';
+  }
+  state.tree.sortKey = header;
+  state.tree.sortDir = dir;
+  renderTreeTable();
+}
+
+function exportTreeCsv(){
+  if (!state.tree || !Array.isArray(state.tree.data) || !state.tree.data.length){
+    alert('Gere a tabela aninhada antes de exportar.');
+    return;
+  }
+  const {data, dimA: A = '', dimB: B = '', sortKey, sortDir} = state.tree;
+  sortTreeData(data, treeSortTarget(sortKey || 'Produtos'), sortDir === 'asc' ? 'asc' : 'desc');
+  const headers = ['Nivel','Chave','Produtos','% prod.','Investimento','% inv.','CPM','Impressões','CTR','Cliques','Conversões','CPC','Taxa de conv','Vendas','%','ROAS','Ticket médio','Lucro','Média de invest. por prod.','Média de Custo / Produto'];
   let csv = headers.join(',')+'\n';
-  const toRow = (lvl, key, obj)=> [lvl,`"${key.replaceAll('"','""')}"`,obj['Produtos'],obj['% prod.'],obj['Investimento'],obj['% inv.'],obj['CPM'],obj['Impressões'],obj['CTR'],obj['Cliques'],obj['CPC'],obj['Taxa de conv'],obj['Vendas'],obj['%'],obj['ROAS'],obj['Ticket médio'],obj['Lucro'],obj['Média de invest. por prod.'],obj['Média de Custo / Produto']].join(',');
+  const toRow = (lvl, key, obj)=>{
+    const keyStr = String(key ?? '');
+    return [
+      lvl,
+      `"${keyStr.replaceAll('"','""')}"`,
+      obj['Produtos'],
+      obj['% prod.'],
+      obj['Investimento'],
+      obj['% inv.'],
+      obj['CPM'],
+      obj['Impressões'],
+      obj['CTR'],
+      obj['Cliques'],
+      obj['Conversões'],
+      obj['CPC'],
+      obj['Taxa de conv'],
+      obj['Vendas'],
+      obj['%'],
+      obj['ROAS'],
+      obj['Ticket médio'],
+      obj['Lucro'],
+      obj['Média de invest. por prod.'],
+      obj['Média de Custo / Produto']
+    ].join(',');
+  };
   for (const node of data){
     csv += toRow('A:'+A, node.key, node) + '\n';
-    for (const ch of node.children){ csv += toRow('B:'+B, ch.key, ch) + '\n'; }
+    for (const ch of node.children){
+      csv += toRow('B:'+B, ch.key, ch) + '\n';
+    }
+  }
+  if (state.tree.summary){
+    csv += toRow('TOTAL','Total geral', state.tree.summary) + '\n';
   }
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
@@ -1326,6 +1479,11 @@ if (navButtons.length){
     setSection(initial);
   }
 }
+
+// redimensionar gráficos ao redimensionar a janela
+window.addEventListener('resize', ()=>{
+  window.requestAnimationFrame(triggerPlotlyResize);
+});
 
 byId('finishConfig')?.addEventListener('click', ()=>{
   setSection('graphs');
