@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Funil de Campanhas — Visual Builder</title>
+  <!-- Geist from Google Fonts (fallbacks included) -->
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0e14;
+      --panel:#0f1420;
+      --panel-2:#0c1220;
+      --muted:#8b9db9;
+      --text:#e6ecff;
+      --accent:#6aa7ff;
+      --accent-2:#7c6aff;
+      --ok:#2ad1a3;
+      --warn:#f6b04a;
+      --danger:#ff6a88;
+      --radius:18px;
+      --shadow:0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);
+      --glass:rgba(255,255,255,.06);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:radial-gradient(1200px 800px at 80% -10%, #24314c40, transparent),
+                radial-gradient(900px 700px at -20% 110%, #2b365640, transparent), var(--bg);
+      color:var(--text); font-family:'Geist', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+      letter-spacing:.2px;
+    }
+    .app{display:grid; grid-template-columns:450px 1fr; height:100%;}
+    .sidebar{padding:22px; border-right:1px solid rgba(255,255,255,.06); position:relative;}
+    .logo{display:flex; align-items:center; gap:10px; font-weight:700; font-size:18px; margin-bottom:16px;}
+    .logo-dot{width:10px;height:10px;border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 0 18px #6aa7ffaa}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius); box-shadow:var(--shadow);}
+    .section-title{font-weight:600; color:#cfe0ff; margin:18px 0 10px}
+
+    .add-form{padding:12px; display:grid; gap:8px}
+    .row{display:grid; grid-template-columns:1fr; gap:8px}
+    .inline-2{display:grid; grid-template-columns:1fr 140px; gap:8px; align-items:end}
+    label{font-size:12px; color:var(--muted)}
+    input[type="text"], select, input[type="color"]{
+      width:100%; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:var(--panel);
+      color:var(--text); outline:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .btn{cursor:pointer; padding:8px 10px; border-radius:10px; font-weight:600; font-size:12px; transition:.25s transform, background .2s ease, border-color .2s ease;
+      background:#F5F5F5; color:#0D0D0D; border:1px solid #F5F5F5; box-shadow:none;
+    }
+    .btn:hover{transform:translateY(-1px); background:#ffffff; border-color:#ffffff}
+    .btn.ghost{background:transparent; color:var(--text); border:1px solid rgba(255,255,255,.28)}
+    .btn.ghost:hover{background:rgba(255,255,255,.10); border-color:rgba(255,255,255,.38)}
+
+    .lists{display:grid; grid-template-columns:1fr; gap:12px; margin-top:12px; max-height:calc(100vh - 360px); overflow:auto}
+    .list{padding:10px}
+    .tag{display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; background:var(--panel);
+      border:1px solid rgba(255,255,255,.08); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); justify-content:space-between; width:100%;}
+    .tag-name{display:flex; align-items:center; gap:8px}
+    .swatch{width:10px; height:10px; border-radius:50%; box-shadow:0 0 0 2px rgba(255,255,255,.12) inset}
+    .tag-actions{display:flex; gap:6px}
+    .ghost{background:transparent; border:1px solid rgba(255,255,255,.1); color:#cfe0ff}
+
+    .canvas{position:relative; overflow:hidden}
+    .stage{height:calc(33.333% - 22px); margin:11px 0; padding:18px; position:relative; z-index:1}
+    .stage-title{position:absolute; left:18px; top:12px; font-size:12px; color:#a9bad7; letter-spacing:.6px; text-transform:uppercase}
+    .stage-inner{display:flex; gap:12px; align-items:center; height:100%; width:100%; justify-content:space-evenly; flex-wrap:wrap}
+
+    .pill{padding:10px 14px; border-radius:999px; background:#030303;
+      border:1px solid rgba(255,255,255,.12); display:flex; align-items:center; gap:10px; box-shadow:var(--shadow); user-select:none; position:relative; z-index:2}
+    .pill .dot{width:10px;height:10px;border-radius:50%}
+    .pill .pill-name[contenteditable="true"]{outline:none; border-bottom:1px dashed transparent}
+    .pill .pill-name[contenteditable="true"]:focus{border-bottom-color: rgba(255,255,255,.25)}
+
+    .panel-header{display:flex; align-items:center; justify-content:space-between; padding:14px 16px;}
+    .hint{font-size:12px; color:#9fb2d6}
+
+    .footer{position:absolute; bottom:16px; left:22px; right:22px; display:flex; align-items:center; justify-content:space-between; opacity:.8}
+
+    /* SVG layer */
+    svg#links{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; filter:drop-shadow(0 6px 24px rgba(73, 130, 255, .18)); z-index:0}
+
+    /* Modal */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(5,8,13,.6); backdrop-filter:blur(6px); z-index:9999}
+    .modal.active{display:flex}
+    .modal .box{width:min(560px, 94vw);}
+    .box{padding:18px}
+    .box h3{margin:0 0 8px}
+    .box .grid{display:grid; grid-template-columns:1fr; gap:10px}
+    .box .actions{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
+
+    /* Pretty separators */
+    .stage-top{background:linear-gradient(180deg, rgba(122, 180, 255, .10), rgba(255,255,255,.02)); border:1px solid rgba(122, 180, 255, .25); border-radius:20px}
+    .stage-mid{background:linear-gradient(180deg, rgba(167, 122, 255, .10), rgba(255,255,255,.02)); border:1px solid rgba(167, 122, 255, .25); border-radius:20px}
+    .stage-bot{background:linear-gradient(180deg, rgba(47, 209, 163, .10), rgba(255,255,255,.02)); border:1px solid rgba(47, 209, 163, .25); border-radius:20px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo"><span class="logo-dot"></span> Funil de Campanhas | Adicione campanhas e crie conexões</div>
+      
+      <div class="card add-form">
+        <div class="row">
+          <div>  
+            <label>Nome da campanha</label>
+            <input id="name" type="text" placeholder="ex: Descoberta YouTube, PMax Marca, Remarketing 30d" />
+          </div>
+          <div class="inline-2">
+            <div>
+              <label>Estágio</label> 
+              <select id="stage">
+                <option value="topo">Topo</option>
+                <option value="meio">Meio</option>
+                <option value="fundo">Fundo</option>
+              </select>
+            </div>
+            <div>
+              <label>Cor</label>
+              <input id="color" type="color" value="#6aa7ff" />
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap">
+            <button class="btn" id="addBtn">Adicionar</button>
+            <button class="btn ghost" id="exportBtn" type="button">Exportar</button>
+            <label class="btn ghost" for="importInput" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">Importar
+              <input id="importInput" type="file" accept="application/json" style="display:none" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Campanhas</div>
+      <div class="lists">
+        <div class="card list" id="list-topo"></div>
+        <div class="card list" id="list-meio"></div>
+        <div class="card list" id="list-fundo"></div>
+      </div>
+
+      <div class="footer hint">Dica: clique em “Ligar →” para conectar uma campanha ao próximo estágio.</div>
+    </aside>
+
+    <!-- Canvas -->
+    <main class="canvas">
+      <svg id="links"></svg>
+      <section class="stage stage-top">
+        <div class="stage-title">Topo do Funil</div>
+        <div class="stage-inner" id="stage-topo"></div>
+      </section>
+      <section class="stage stage-mid">
+        <div class="stage-title">Meio do Funil</div>
+        <div class="stage-inner" id="stage-meio"></div>
+      </section>
+      <section class="stage stage-bot">
+        <div class="stage-title">Fundo do Funil</div>
+        <div class="stage-inner" id="stage-fundo"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal de conexões -->
+  <div class="modal" id="connectModal">
+    <div class="card box">
+      <h3>Conectar campanhas</h3>
+      <div class="hint" id="connectHint"></div>
+      <div class="grid">
+        <label id="connectLabel"></label>
+        <select id="connectSelect" multiple size="6"></select>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="cancelConnect">Cancelar</button>
+        <button class="btn" id="saveConnect">Salvar conexões</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Data model
+    const state = {
+      topo: [], meio: [], fundo: [],
+      linksTM: {}, // topoId -> [meioId]
+      linksMF: {}, // meioId -> [fundoId]
+      seq: 0
+    };
+
+    // Helpers
+    const $ = (q)=>document.querySelector(q);
+    const el = (tag, attrs={}, children=[])=>{
+      const e = document.createElement(tag);
+      Object.entries(attrs).forEach(([k,v])=>{
+        if(k==='class') e.className=v; else if(k==='style') Object.assign(e.style,v); else if(k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k,v);
+      });
+      children.forEach(c=>{ if(typeof c === 'string') e.appendChild(document.createTextNode(c)); else if(c) e.appendChild(c); });
+      return e;
+    };
+
+    // Balance helper: average destination index for stable ordering
+    function avgIndex(item, linksMap, indexMap){
+      const arr = linksMap[item.id] || [];
+      if(!arr.length) return 1e9; // send unlinked to the end
+      let sum = 0, n = 0;
+      for(const id of arr){
+        const idx = indexMap.get(id);
+        if(typeof idx === 'number'){ sum += idx; n++; }
+      }
+      return n? (sum/n) : 1e9;
+    }
+
+    function compareColor(a,b){
+      const ca = String(a.color||'').toLowerCase();
+      const cb = String(b.color||'').toLowerCase();
+      if (ca < cb) return -1; if (ca > cb) return 1; return 0;
+    }
+
+    function addCampaign(stage, name, color){
+      const id = `c${++state.seq}`;
+      state[stage].push({id, name, color});
+      renderAll();
+    }
+
+    // UI: lists with actions
+    function renderLists(){
+      ['topo','meio','fundo'].forEach(stage=>{
+        const wrap = document.getElementById(`list-${stage}`);
+        wrap.innerHTML = '';
+        wrap.appendChild(el('div', {class:'hint', style:{marginBottom:'8px'}}, [stageTitle(stage)]));
+        state[stage].forEach(item=>{
+          const connectBtn = el('button', {class:'btn ghost', onclick:()=>openConnect(stage,item.id)}, ['Ligar →']);
+          const delBtn = el('button', {class:'btn ghost', onclick:()=>removeItem(stage,item.id)}, ['Remover']);
+          const tag = el('div', {class:'tag'}, [
+            el('div', {class:'tag-name'}, [el('span',{class:'swatch', style:{background:item.color}}), el('span',{},[item.name])]),
+            el('div',{class:'tag-actions'}, [connectBtn, delBtn])
+          ]);
+          wrap.appendChild(tag);
+        });
+      })
+    }
+
+    function removeItem(stage,id){
+      state[stage] = state[stage].filter(x=>x.id!==id);
+      if(stage==='topo') delete state.linksTM[id];
+      if(stage==='meio') delete state.linksMF[id];
+      Object.keys(state.linksTM).forEach(k=> state.linksTM[k] = (state.linksTM[k]||[]).filter(x=>x!==id));
+      Object.keys(state.linksMF).forEach(k=> state.linksMF[k] = (state.linksMF[k]||[]).filter(x=>x!==id));
+      renderAll();
+    }
+
+    function stageTitle(stage){
+      return stage==='topo' ? 'Topo' : stage==='meio' ? 'Meio' : 'Fundo';
+    }
+
+    // Modal connect
+    let pending = null; // {fromStage, fromId}
+    function openConnect(stage, id){
+      pending = {fromStage:stage, fromId:id};
+      const nextStage = stage==='topo'?'meio': stage==='meio'?'fundo': null;
+      if(!nextStage){ alert('Itens de Fundo não conectam para baixo.'); return; }
+      $('#connectHint').textContent = `Ligando do ${stageTitle(stage)} para ${stageTitle(nextStage)}`;
+      $('#connectLabel').textContent = `Selecione 1+ campanhas de ${stageTitle(nextStage)} para conectar:`;
+      const sel = $('#connectSelect'); sel.innerHTML='';
+      state[nextStage].forEach(it=>{
+        const o = el('option', {value:it.id}, [it.name]); sel.appendChild(o);
+      });
+      // Pre-select existing
+      const existing = stage==='topo' ? (state.linksTM[id]||[]) : (state.linksMF[id]||[]);
+      Array.from(sel.options).forEach(o=>{ o.selected = existing.includes(o.value) });
+      $('#connectModal').classList.add('active');
+    }
+    $('#cancelConnect').addEventListener('click', ()=> $('#connectModal').classList.remove('active'));
+    $('#saveConnect').addEventListener('click', ()=>{
+      const sel = $('#connectSelect');
+      const chosen = Array.from(sel.selectedOptions).map(o=>o.value);
+      if(pending){
+        if(pending.fromStage==='topo') state.linksTM[pending.fromId] = chosen; else state.linksMF[pending.fromId] = chosen;
+      }
+      $('#connectModal').classList.remove('active');
+      renderDiagram();
+      renderLists();
+    });
+
+    // Diagram rendering
+    function renderDiagram(){
+      // Update stage titles with counts
+      const tTopo = document.querySelector('.stage-top .stage-title');
+      const tMeio = document.querySelector('.stage-mid .stage-title');
+      const tFundo = document.querySelector('.stage-bot .stage-title');
+      if (tTopo) tTopo.textContent = `Topo do Funil (${state.topo.length})`;
+      if (tMeio) tMeio.textContent = `Meio do Funil (${state.meio.length})`;
+      if (tFundo) tFundo.textContent = `Fundo do Funil (${state.fundo.length})`;
+      // nodes
+      // Compute balanced orders (reduce crossings)
+      const topoOrig = state.topo.slice();
+      const meioOrig = state.meio.slice();
+      const fundoOrig = state.fundo.slice();
+
+      // 1) Topo: ordena pelo índice médio dos destinos em MEIO
+      const mapMeio0 = new Map(meioOrig.map((it,idx)=>[it.id, idx]));
+      const topoItems = topoOrig.slice().sort((a,b)=> compareColor(a,b) || (avgIndex(a, state.linksTM, mapMeio0) - avgIndex(b, state.linksTM, mapMeio0)) || a.name.localeCompare(b.name));
+
+      // 2) Meio: barycenter (entradas do topo ordenado e saídas para fundo atual)
+      const mapTopo1 = new Map(topoItems.map((it,idx)=>[it.id, idx]));
+      const mapFundo0 = new Map(fundoOrig.map((it,idx)=>[it.id, idx]));
+      function barycenterMeio(item){
+        // média dos índices das entradas vindas do topo
+        let inSum=0,inN=0; for(const [fromId,arr] of Object.entries(state.linksTM)){ if(arr?.includes(item.id)){ const idx = mapTopo1.get(fromId); if(typeof idx==='number'){ inSum+=idx; inN++; } } }
+        const inAvg = inN? inSum/inN : 1e9;
+        // média dos índices das saídas para o fundo
+        const outAvg = avgIndex(item, state.linksMF, mapFundo0);
+        // peso maior para entradas, menor para saídas
+        return (isFinite(inAvg)? 0.6*inAvg : 0.6*1e9) + (isFinite(outAvg)? 0.4*outAvg : 0.4*1e9);
+      }
+      const meioItems = meioOrig.slice().sort((a,b)=> compareColor(a,b) || (barycenterMeio(a) - barycenterMeio(b)) || a.name.localeCompare(b.name));
+
+      // 3) Fundo: ordena pelo índice médio dos emissores em MEIO já ordenado
+      const mapMeio1 = new Map(meioItems.map((it,idx)=>[it.id, idx]));
+      const fundoItems = fundoOrig.slice().sort((a,b)=>{
+        // inbound map: meio -> [fundoIds]
+        const inboundAvg = (item)=>{
+          let sum=0,n=0; for(const [fromId,arr] of Object.entries(state.linksMF)){ if(arr?.includes(item.id)){ const idx=mapMeio1.get(fromId); if(typeof idx==='number'){ sum+=idx; n++; } } } return n? sum/n : 1e9;
+        };
+        const va = inboundAvg(a), vb = inboundAvg(b);
+        return compareColor(a,b) || (va-vb) || a.name.localeCompare(b.name);
+      });
+
+      const byStageItems = {topo: topoItems, meio: meioItems, fundo: fundoItems};
+
+      // Render in computed order
+      ;['topo','meio','fundo'].forEach(stage=>{
+        const lane = document.getElementById(`stage-${stage}`);
+        lane.innerHTML = '';
+        const items = byStageItems[stage] || [];
+        items.forEach(item=>{
+          const nameSpan = el('span', {class:'pill-name', contenteditable:'true', spellcheck:'false',
+            onblur:(e)=> handleEditName(item.id, e.target.textContent||''),
+            onkeydown:(e)=>{ if(e.key==='Enter'){ e.preventDefault(); e.currentTarget.blur(); } }
+          }, [item.name]);
+          const p = el('div',{class:'pill', id:item.id}, [el('span',{class:'dot', style:{background:item.color}}), nameSpan]);
+          lane.appendChild(p);
+        });
+      });
+
+      // links
+      const svg = document.getElementById('links');
+      svg.innerHTML = '';
+      const rectCanvas = svg.getBoundingClientRect();
+
+      function centerOf(elm){
+        const r = elm.getBoundingClientRect();
+        return {x:r.left - rectCanvas.left + r.width/2, y:r.top - rectCanvas.top + r.height/2};
+      }
+
+      function pathCurve(a,b,color){
+        const dx = (b.x - a.x) * .25; // curve strength
+        const d = `M ${a.x},${a.y} C ${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}`;
+        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.setAttribute('d', d);
+        p.setAttribute('fill','none');
+        p.setAttribute('stroke', color);
+        p.setAttribute('stroke-opacity','0.85');
+        p.setAttribute('stroke-width','2');
+        p.setAttribute('stroke-linecap','round');
+        p.style.filter = 'blur(.0px)';
+        svg.appendChild(p);
+        // glow
+        const glow = document.createElementNS('http://www.w3.org/2000/svg','path');
+        glow.setAttribute('d', d);
+        glow.setAttribute('fill','none');
+        glow.setAttribute('stroke', color);
+        glow.setAttribute('stroke-opacity','0.18');
+        glow.setAttribute('stroke-width','6');
+        svg.appendChild(glow);
+      }
+
+      // connect Topo -> Meio
+      Object.entries(state.linksTM).forEach(([fromId, arr])=>{
+        const from = document.getElementById(fromId); if(!from) return;
+        const a = centerOf(from);
+        arr.forEach(midId=>{
+          const to = document.getElementById(midId); if(!to) return;
+          const b = centerOf(to);
+          const color = state.topo.find(x=>x.id===fromId)?.color || '#6aa7ff';
+          pathCurve(a,b,color);
+        })
+      });
+      // connect Meio -> Fundo
+      Object.entries(state.linksMF).forEach(([fromId, arr])=>{
+        const from = document.getElementById(fromId); if(!from) return;
+        const a = centerOf(from);
+        arr.forEach(botId=>{
+          const to = document.getElementById(botId); if(!to) return;
+          const b = centerOf(to);
+          const color = state.meio.find(x=>x.id===fromId)?.color || '#7c6aff';
+          pathCurve(a,b,color);
+        })
+      });
+    }
+
+    function renderAll(){
+      renderLists();
+      renderDiagram();
+    }
+
+    function handleEditName(id, rawText){
+      const text = String(rawText||'').trim();
+      if(!text){ renderDiagram(); return; }
+      const stages = ['topo','meio','fundo'];
+      for(const st of stages){
+        const idx = state[st].findIndex(x=> x.id===id);
+        if(idx!==-1){ state[st][idx].name = text; break; }
+      }
+      renderAll();
+    }
+
+    // Add form
+    document.getElementById('addBtn').addEventListener('click', ()=>{
+      const name = document.getElementById('name').value.trim();
+      if(!name) return alert('Dê um nome para a campanha.');
+      const stage = document.getElementById('stage').value;
+      const color = document.getElementById('color').value;
+      addCampaign(stage, name, color);
+      document.getElementById('name').value = '';
+    });
+
+    // Export / Import config (JSON)
+    function currentPayload(){
+      return {
+        topo: state.topo,
+        meio: state.meio,
+        fundo: state.fundo,
+        linksTM: state.linksTM,
+        linksMF: state.linksMF,
+        seq: state.seq
+      };
+    }
+    function applyPayload(payload){
+      if(!payload) return;
+      state.topo = Array.isArray(payload.topo)? payload.topo : [];
+      state.meio = Array.isArray(payload.meio)? payload.meio : [];
+      state.fundo = Array.isArray(payload.fundo)? payload.fundo : [];
+      state.linksTM = payload.linksTM || {};
+      state.linksMF = payload.linksMF || {};
+      state.seq = Number(payload.seq)||0;
+      renderAll();
+    }
+    document.getElementById('exportBtn')?.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(currentPayload(), null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'funil_config.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('importInput')?.addEventListener('change', async (e)=>{
+      const f = e.target.files?.[0]; if(!f) return;
+      try{
+        const text = await f.text();
+        const payload = JSON.parse(text);
+        applyPayload(payload);
+      }catch(err){
+        alert('Falha ao importar configuração.');
+        console.error(err);
+      }finally{
+        e.target.value = '';
+      }
+    });
+
+    // Re-render on resize (to reposition paths)
+    window.addEventListener('resize', ()=>{ renderDiagram(); });
+
+    // Seed examples for preview
+    addCampaign('topo','Descoberta YouTube','\#6aa7ff');
+    addCampaign('topo','PMax Prospecting','\#56c4ff');
+    addCampaign('meio','Conteúdo Blog + Remarketing 7d','\#7c6aff');
+    addCampaign('meio','Lead Magnet — E-book','\#a07cff');
+    addCampaign('fundo','PMax Marca','\#2ad1a3');
+    addCampaign('fundo','RMK Carrinho 14d','\#4de1bf');
+
+    // Quick demo links
+    setTimeout(()=>{
+      const t1 = state.topo[0].id; const t2 = state.topo[1].id;
+      const m1 = state.meio[0].id; const m2 = state.meio[1].id;
+      const f1 = state.fundo[0].id; const f2 = state.fundo[1].id;
+      state.linksTM[t1] = [m1,m2];
+      state.linksTM[t2] = [m1];
+      state.linksMF[m1] = [f1];
+      state.linksMF[m2] = [f1,f2];
+      renderAll(); 
+    }, 50);
+  </script>
+</body>
+</html>
